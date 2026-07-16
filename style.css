@@ -349,8 +349,8 @@
     html, body{max-width:100%; overflow-x:hidden;}
     .app{flex-direction:column; width:100%; overflow-x:hidden;}
     .sidebar{width:100%; min-height:auto; max-height:none; position:relative; padding:16px; overflow-y:visible;}
-    .nav{flex-direction:row; overflow-x:auto; margin-top:14px; gap:6px; -webkit-overflow-scrolling:touch;}
-    .nav button{white-space:nowrap; padding:8px 12px;}
+    .nav{flex-direction:row; overflow-x:auto; margin-top:14px; gap:10px; -webkit-overflow-scrolling:touch; padding-bottom:4px;}
+    .nav button{white-space:nowrap; padding:8px 14px; flex:0 0 auto; margin-right:2px;}
     .main{padding:16px; max-width:100%; width:100%;}
     .page-head{width:100%;}
     .page-head h1{font-size:24px;}
