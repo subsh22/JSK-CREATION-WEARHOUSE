@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSK Creation — Billing Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#241C1F;
+    --paper:#FBF6EC;
+    --surface:#FFFFFF;
+    --line:#E6DCC6;
+    --maroon:#6C1E3C;
+    --maroon-dark:#521530;
+    --gold:#C9973B;
+    --gold-soft:#EFDCB0;
+    --teal:#0F6E6E;
+    --teal-soft:#DCEEEC;
+    --danger:#A23B2E;
+    --shadow: 0 1px 2px rgba(36,28,31,0.06), 0 6px 20px rgba(36,28,31,0.06);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  .app *{box-sizing:border-box;}
+  .app{
+    font-family:'IBM Plex Sans', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    min-height:100vh;
+    display:flex;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(108,30,60,0.05) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+  .display{font-family:'Fraunces', serif;}
+
+  /* ---------- beaded thread signature ---------- */
+  .beads{
+    height:14px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin: 6px 0 18px;
+    overflow:hidden;
+  }
+  .beads span{
+    width:7px;height:7px;border-radius:50%;flex:0 0 auto;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.15) inset;
+  }
+
+  /* ---------- sidebar ---------- */
+  .sidebar{
+    width:230px;
+    flex:0 0 auto;
+    background: linear-gradient(180deg, var(--maroon), var(--maroon-dark));
+    color:#F6E9D9;
+    padding:28px 18px;
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+    position:sticky;
+    top:0;
+  }
+  .brand{
+    font-family:'Fraunces', serif;
+    font-size:22px;
+    font-weight:600;
+    letter-spacing:0.02em;
+    color:#FBF6EC;
+    line-height:1.15;
+  }
+  .brand small{
+    display:block;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:10.5px;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    color:var(--gold-soft);
+    font-weight:600;
+    margin-top:4px;
+  }
+  .nav{margin-top:36px; display:flex; flex-direction:column; gap:4px;}
+  .nav button{
+    all:unset;
+    cursor:pointer;
+    padding:10px 12px;
+    border-radius:8px;
+    font-size:14px;
+    font-weight:500;
+    color:#F1E1CE;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .nav button .dot{
+    width:6px;height:6px;border-radius:50%;background:rgba(246,233,217,0.35);
+    flex:0 0 auto;
+    transition: background 0.15s ease;
+  }
+  .nav button:hover{background:rgba(246,233,217,0.08);}
+  .nav button.active{background:rgba(201,151,59,0.22); color:#FBF6EC;}
+  .nav button.active .dot{background:var(--gold);}
+  .sidebar-foot{
+    margin-top:auto;
+    font-size:11px;
+    color:rgba(246,233,217,0.5);
+    line-height:1.6;
+    padding-top:20px;
+  }
+
+  /* ---------- main ---------- */
+  .main{flex:1 1 auto; padding:36px 44px; max-width:1180px;}
+  .page-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .page-head h1{
+    font-family:'Fraunces', serif;
+    font-size:30px;
+    font-weight:600;
+    margin:0;
+  }
+  .page-head p{margin:4px 0 0; color:#6B5E53; font-size:13.5px;}
+  .btn{
+    all:unset;
+    cursor:pointer;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    padding:10px 18px;
+    border-radius:7px;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    transition: transform 0.1s ease, box-shadow 0.15s ease, background 0.15s ease;
+  }
+  .btn:active{transform: translateY(1px);}
+  .btn-primary{background:var(--maroon); color:#FBF6EC;}
+  .btn-primary:hover{box-shadow:var(--shadow); background:var(--maroon-dark);}
+  .btn-gold{background:var(--gold); color:#3A2A0E;}
+  .btn-gold:hover{box-shadow:var(--shadow);}
+  .btn-ghost{background:transparent; color:var(--maroon); border:1px solid var(--line);}
+  .btn-ghost:hover{background:#fff;}
+  .btn-danger{background:transparent; color:var(--danger); border:1px solid #EAD3CC;}
+  .btn-danger:hover{background:#FBEEEA;}
+  .btn[disabled]{opacity:0.4; cursor:not-allowed;}
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:12px;
+    box-shadow:var(--shadow);
+    padding:24px;
+  }
+  .grid{display:grid; gap:20px;}
+  .stat-grid{grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); margin-top:24px;}
+  .stat{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:18px 20px;
+    box-shadow:var(--shadow);
+  }
+  .stat .label{font-size:11.5px; text-transform:uppercase; letter-spacing:0.1em; color:#8A7A6B; font-weight:600;}
+  .stat .value{font-family:'Fraunces', serif; font-size:28px; margin-top:6px; color:var(--maroon);}
+  .stat .value.teal{color:var(--teal);}
+
+  table{width:100%; border-collapse:collapse; font-size:14px;}
+  .table-wrap{width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  .table-wrap table{min-width:520px;}
+  thead th{
+    text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.08em;
+    color:#8A7A6B; font-weight:600; padding:0 10px 10px; border-bottom:1px solid var(--line);
+  }
+  tbody td{padding:12px 10px; border-bottom:1px solid #F1EADA; vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr{transition: background 0.12s ease;}
+  tbody tr:hover{background:#FCFAF3;}
+  .thumb{
+    width:36px; height:36px; border-radius:8px; overflow:hidden; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Fraunces', serif; font-weight:600; font-size:14px; color:#fff;
+  }
+  .thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .item-name{font-weight:600;}
+  .num{font-family:'IBM Plex Mono', monospace; color:var(--teal); font-weight:500;}
+  .muted{color:#8A7A6B; font-size:12.5px;}
+  .pill{
+    font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px;
+    display:inline-block;
+  }
+  .pill.low{background:#FBEEEA; color:var(--danger);}
+  .pill.ok{background:var(--teal-soft); color:var(--teal);}
+
+  /* ---------- professional form styling (applies anywhere in the app, not just <form>) ---------- */
+  .field{margin-bottom:16px;}
+  .app label{display:block; font-size:11.5px; font-weight:700; color:#7A6A5A; margin-bottom:7px; text-transform:uppercase; letter-spacing:0.07em;}
+  .app input, .app select{
+    width:100%; padding:11px 14px; border-radius:8px; border:1.5px solid var(--line);
+    font-family:'IBM Plex Sans', sans-serif; font-size:14.5px; color:var(--ink);
+    background:#FFFEFC;
+    box-shadow: inset 0 1px 2px rgba(36,28,31,0.03);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    height:44px;
+  }
+  .app input::placeholder{color:#B8AA9A;}
+  .app input:hover, .app select:hover{border-color:#D8C79F;}
+  .app input:focus, .app select:focus{
+    outline:none; border-color:var(--teal);
+    box-shadow: 0 0 0 3px var(--teal-soft);
+    background:#fff;
+  }
+  .app input:disabled{background:#F5F0E4; color:#9A8C7C; cursor:not-allowed; box-shadow:none;}
+  .app select{
+    appearance:none;
+    -webkit-appearance:none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1L6 6L11 1' stroke='%236B5E53' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;
+    background-position: right 14px center;
+    padding-right:34px;
+    cursor:pointer;
+  }
+  .app input[type="number"]{ text-align:right; font-family:'IBM Plex Mono', monospace; }
+  .field-row{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .field-row.three{grid-template-columns:1fr 1fr 1fr;}
+  .field-hint{font-size:11.5px; color:#9A8C7C; margin-top:5px;}
+  .pic-preview-row{display:flex; align-items:center; gap:12px; margin-top:8px;}
+  .prefix-input{position:relative;}
+  .prefix-input .prefix-tag{
+    position:absolute; left:1px; top:1px; bottom:1px; display:flex; align-items:center;
+    padding:0 12px; font-size:13px; font-weight:600; color:#7A6A5A; background:#F3ECDC;
+    border-radius:7px 0 0 7px; border-right:1.5px solid var(--line);
+    pointer-events:none;
+  }
+  .prefix-input input{padding-left:56px;}
+
+  /* icon-prefixed inputs, used on the invoice client-detail fields */
+  .icon-field{position:relative;}
+  .icon-field svg{
+    position:absolute; left:13px; top:50%; transform:translateY(-50%);
+    width:16px; height:16px; stroke:#9A8C7C; pointer-events:none;
+  }
+  .icon-field input{padding-left:38px;}
+  .icon-field input:focus ~ svg, .icon-field:focus-within svg{stroke:var(--teal);}
+
+  .btn-row{display:flex; gap:10px; flex-wrap:wrap;}
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(36,28,31,0.5);
+    display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .modal{
+    background:var(--surface); border-radius:14px; padding:28px; width:100%; max-width:440px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.28);
+  }
+  .modal h2{font-family:'Fraunces', serif; font-size:21px; margin:0 0 4px;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:20px;}
+
+  .empty{
+    text-align:center; padding:50px 20px; color:#8A7A6B;
+  }
+  .empty .glyph{font-size:32px; margin-bottom:10px; opacity:0.5;}
+  .empty h3{font-family:'Fraunces', serif; color:var(--ink); margin:0 0 6px;}
+
+  .filter-chip{
+    display:inline-flex; align-items:center; gap:8px; background:var(--teal-soft); color:var(--teal);
+    padding:6px 12px; border-radius:20px; font-size:12.5px; font-weight:600; margin-bottom:16px;
+  }
+  .filter-chip button{all:unset; cursor:pointer; font-weight:700;}
+
+  /* ---------- invoice builder ---------- */
+  .line-item-row{
+    display:grid; grid-template-columns: 2fr 90px 110px 110px 34px;
+    gap:10px; align-items:center; margin-bottom:10px;
+  }
+  .line-item-row .amt{font-family:'IBM Plex Mono', monospace; text-align:right; color:var(--teal); font-weight:600;}
+  .remove-row{
+    all:unset; cursor:pointer; color:var(--danger); font-size:16px; text-align:center;
+  }
+  .add-row-btn{
+    all:unset; cursor:pointer; font-size:13px; font-weight:600; color:var(--teal);
+    display:inline-flex; align-items:center; gap:6px; margin-top:4px;
+  }
+
+  .totals-box{
+    margin-top:18px; padding-top:16px; border-top:2px solid var(--ink);
+    display:flex; justify-content:flex-end;
+  }
+  .totals-box .row{display:flex; gap:26px; align-items:baseline;}
+  .totals-box .row .lbl{font-size:13px; color:#6B5E53;}
+  .totals-box .row .amt{font-family:'Fraunces', serif; font-size:26px; color:var(--maroon);}
+
+  /* ---------- invoice preview ---------- */
+  .invoice-sheet{
+    background:#fff; border-radius:12px; padding:44px 46px; box-shadow:var(--shadow);
+    border:1px solid var(--line);
+  }
+  .inv-top{display:flex; justify-content:space-between; align-items:flex-start;}
+  .inv-brand{font-family:'Fraunces', serif; font-size:20px; font-weight:600; letter-spacing:0.02em;}
+  .inv-brand small{display:block; font-size:10px; letter-spacing:0.14em; color:var(--gold); font-weight:700; text-transform:uppercase; margin-top:3px;}
+  .inv-meta{text-align:right; font-size:12.5px; color:#6B5E53;}
+  .inv-meta .num{color:var(--ink); font-weight:600; font-family:'IBM Plex Mono', monospace;}
+  .inv-client{margin-top:30px;}
+  .inv-client h2{font-family:'Fraunces', serif; font-size:24px; margin:0 0 2px;}
+  .inv-client .sub{color:#6B5E53; font-size:13.5px;}
+  .inv-items{margin-top:28px;}
+  .inv-items thead th{color:#8A7A6B;}
+  .inv-items td.qty, .inv-items th.qty{text-align:center;}
+  .inv-items td.amt, .inv-items th.amt{text-align:right; font-family:'IBM Plex Mono', monospace; color:var(--teal);}
+  .inv-items td .row-item{display:flex; align-items:center; gap:10px;}
+
+  @media print{
+    .sidebar, .no-print{display:none !important;}
+    .main{padding:0; max-width:none;}
+    body, .app{background:#fff;}
+    .invoice-sheet{box-shadow:none; border:none; padding:0;}
+  }
+
+  @media (max-width: 860px){
+    .app{flex-direction:column;}
+    .sidebar{width:100%; min-height:auto; position:relative; padding:16px;}
+    .nav{flex-direction:row; overflow-x:auto; margin-top:14px; gap:6px;}
+    .nav button{white-space:nowrap; padding:8px 12px;}
+    .main{padding:16px;}
+    .page-head h1{font-size:24px;}
+    .card{padding:16px;}
+    .stat-grid{grid-template-columns:repeat(2, 1fr); gap:12px;}
+    .stat{padding:14px 16px;}
+    .stat .value{font-size:22px;}
+    .field-row{grid-template-columns:1fr;}
+    .field-row.three{grid-template-columns:1fr;}
+    .line-item-row{grid-template-columns:1fr; gap:6px; padding-bottom:12px; border-bottom:1px solid var(--line);}
+    .line-item-row .amt{text-align:left;}
+    .invoice-sheet{padding:22px 18px;}
+    .inv-top{flex-direction:column; gap:14px;}
+    .inv-meta{text-align:left;}
+    .modal{padding:20px; max-width:100%;}
+    table{font-size:13px;}
+    thead th, tbody td{padding:9px 8px;}
+  }
+
+  @media (max-width: 480px){
+    .brand{font-size:18px;}
+    .page-head{flex-direction:column; align-items:flex-start;}
+    .page-head .btn, .page-head > div[style]{width:100%;}
+    .stat-grid{grid-template-columns:1fr 1fr;}
+    .inv-client h2{font-size:20px;}
+    .totals-box{justify-content:flex-start;}
+    .totals-box .row .amt{font-size:22px;}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ================= persistence layer =================
+     Order of preference: window.storage (claude.ai artifact
+     sandbox) -> localStorage (standalone browser / hosted use)
+     -> in-memory object (last resort, e.g. private/blocked storage) */
+  var memoryFallback = {};
+  var LS_PREFIX = 'jsk-creation:';
+
+  function lsGet(key){
+    try{
+      var raw = window.localStorage.getItem(LS_PREFIX + key);
+      return raw == null ? undefined : JSON.parse(raw);
+    }catch(e){ return undefined; }
+  }
+  function lsSet(key, value){
+    try{ window.localStorage.setItem(LS_PREFIX + key, JSON.stringify(value)); return true; }
+    catch(e){ return false; }
+  }
+
+  async function storeGet(key, fallback){
+    try{
+      if(window.storage){
+        var res = await window.storage.get(key, false);
+        if(res) return JSON.parse(res.value);
+      }
+    }catch(e){ /* key not found in window.storage, keep looking */ }
+    var ls = lsGet(key);
+    if(ls !== undefined) return ls;
+    return memoryFallback.hasOwnProperty(key) ? memoryFallback[key] : fallback;
+  }
+  async function storeSet(key, value){
+    memoryFallback[key] = value;
+    lsSet(key, value);
+    try{
+      if(window.storage){ await window.storage.set(key, JSON.stringify(value), false); }
+    }catch(e){ /* localStorage already has it as a safety net */ }
+  }
+
+  /* ================= state ================= */
+  var state = {
+    view: 'dashboard',
+    items: [],
+    invoices: [],
+    invoiceCounter: 1000,
+    modal: null,
+    draft: null,
+    activeInvoiceId: null,
+    activeItemId: null,
+    clientFilter: null,
+    formErrors: null,
+    editingInvoiceId: null,
+    editingSnapshot: null
+  };
+
+  var PALETTE = ['#6C1E3C','#0F6E6E','#C9973B','#3E5C76','#7A4A9E','#1F6E43','#A23B2E','#2E4A6B'];
+  function colorFor(name){
+    var str = (name || '?');
+    var hash = 0;
+    for(var i=0;i<str.length;i++){ hash = (hash*31 + str.charCodeAt(i)) >>> 0; }
+    return PALETTE[hash % PALETTE.length];
+  }
+  function initials(name){
+    var parts = (name||'?').trim().split(/\s+/).filter(Boolean);
+    if(parts.length === 0) return '?';
+    if(parts.length === 1) return parts[0].slice(0,2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  var UNIT_LABELS = {pc:'pc', pair:'pair', packet:'packet', yard:'yard', gram:'gram'};
+  function unitLabel(unit){ return UNIT_LABELS[unit] || 'pc'; }
+  function fmtMoney(n){
+    n = Number(n)||0;
+    return 'Rs. ' + n.toLocaleString('en-US', {maximumFractionDigits:2});
+  }
+  function fmtDate(iso){
+    if(!iso) return '';
+    var d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+  }
+  function uid(){ return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  /* thumbnail markup for an item/line: real picture if provided, else a monogram badge */
+  function thumbHTML(entity, size){
+    size = size || 36;
+    var style = 'width:'+size+'px;height:'+size+'px;';
+    if(entity.img){
+      return '<div class="thumb" style="'+style+'"><img src="'+esc(entity.img)+'" alt="" onerror="this.parentElement.innerHTML=\''+initials(entity.name)+'\';this.parentElement.style.background=\''+colorFor(entity.name)+'\';"></div>';
+    }
+    var bg = entity.color || colorFor(entity.name);
+    return '<div class="thumb" style="'+style+';background:'+bg+';">'+initials(entity.name)+'</div>';
+  }
+
+  /* ================= init ================= */
+  async function init(){
+    var items = await storeGet('items', null);
+    if(!items){
+      items = [
+        {id: uid(), name:'Kundan', img:'', color: colorFor('Kundan'), qty:12, price:100, unit:'pc'},
+        {id: uid(), name:'Chain', img:'', color: colorFor('Chain'), qty:34, price:100, unit:'pc'},
+        {id: uid(), name:'Beads', img:'', color: colorFor('Beads'), qty:56, price:100, unit:'packet'}
+      ];
+      await storeSet('items', items);
+    }
+    var invoices = await storeGet('invoices', []);
+    var counter = await storeGet('invoiceCounter', 1000);
+    state.items = items;
+    state.invoices = invoices;
+    state.invoiceCounter = counter;
+    render();
+  }
+
+  async function saveItems(){ await storeSet('items', state.items); }
+  async function saveInvoices(){ await storeSet('invoices', state.invoices); }
+  async function saveCounter(){ await storeSet('invoiceCounter', state.invoiceCounter); }
+
+  /* ================= navigation ================= */
+  function abandonEditIfAny(){
+    if(state.editingInvoiceId && state.editingSnapshot){
+      state.editingSnapshot.forEach(function(l){
+        var item = state.items.find(function(i){return i.id === l.itemId;});
+        if(item) item.qty = Math.max(0, item.qty - l.qty);
+      });
+      saveItems();
+    }
+    state.editingInvoiceId = null;
+    state.editingSnapshot = null;
+  }
+
+  function goTo(view){
+    if(state.view === 'new-invoice' && view !== 'new-invoice' && state.editingInvoiceId){
+      abandonEditIfAny();
+      state.draft = null;
+      state.formErrors = null;
+    }
+    state.view = view;
+    if(view === 'new-invoice' && !state.draft){ startDraft(); }
+    if(view !== 'invoices'){ state.clientFilter = null; }
+    render();
+  }
+
+  function startDraft(){
+    state.invoiceCounter += 1;
+    state.draft = {
+      invoiceNo: 'JSK-' + state.invoiceCounter,
+      date: new Date().toISOString().slice(0,10),
+      clientName: '',
+      phone: '',
+      address: '',
+      lines: [ {id:uid(), itemId:'', qty:1} ]
+    };
+  }
+
+  function startDraftForItem(itemId){
+    state.invoiceCounter += 1;
+    state.draft = {
+      invoiceNo: 'JSK-' + state.invoiceCounter,
+      date: new Date().toISOString().slice(0,10),
+      clientName: '',
+      phone: '',
+      address: '',
+      lines: [ {id:uid(), itemId:itemId, qty:1} ]
+    };
+    state.editingInvoiceId = null;
+    state.editingSnapshot = null;
+    state.view = 'new-invoice';
+    render();
+  }
+
+  /* ================= item CRUD ================= */
+  function openItemModal(item){
+    state.modal = {type:'item', payload: item ? Object.assign({}, item) : {id:null, name:'', img:'', qty:0, price:0, unit:'pc'}};
+    render();
+  }
+  async function submitItemModal(formEl){
+    var fd = new FormData(formEl);
+    var name = (fd.get('name')||'').toString().trim();
+    var qty = Number(fd.get('qty'))||0;
+    var price = Number(fd.get('price'))||0;
+    var img = (fd.get('img')||'').toString().trim();
+    var unit = (fd.get('unit')||'pc').toString();
+    if(!name){ return; }
+    var payload = state.modal.payload;
+    if(payload.id){
+      var it = state.items.find(function(i){return i.id === payload.id;});
+      if(it){ it.name = name; it.qty = qty; it.price = price; it.img = img; it.unit = unit; it.color = colorFor(name); }
+    } else {
+      state.items.push({id: uid(), name:name, img:img, color: colorFor(name), qty:qty, price:price, unit:unit});
+    }
+    await saveItems();
+    state.modal = null;
+    render();
+  }
+  function confirmDeleteItem(id){
+    state.modal = {type:'confirmDeleteItem', payload:{id:id}};
+    render();
+  }
+  async function deleteItem(id){
+    state.items = state.items.filter(function(i){return i.id !== id;});
+    await saveItems();
+    state.modal = null;
+    render();
+  }
+
+  /* ================= invoice draft editing ================= */
+  function addDraftLine(){
+    state.draft.lines.push({id:uid(), itemId:'', qty:1});
+    render();
+  }
+  function removeDraftLine(lineId){
+    if(state.draft.lines.length === 1) return;
+    state.draft.lines = state.draft.lines.filter(function(l){return l.id !== lineId;});
+    render();
+  }
+  function updateDraftLine(lineId, field, value){
+    var line = state.draft.lines.find(function(l){return l.id === lineId;});
+    if(!line) return;
+    if(field === 'itemId') line.itemId = value;
+    if(field === 'qty') line.qty = Math.max(0, Number(value)||0);
+    render();
+  }
+  function updateDraftField(field, value){
+    state.draft[field] = value;
+  }
+
+  function draftTotal(){
+    var total = 0;
+    state.draft.lines.forEach(function(l){
+      var item = state.items.find(function(i){return i.id === l.itemId;});
+      if(item) total += item.price * l.qty;
+    });
+    return total;
+  }
+
+  function draftErrors(){
+    var errs = [];
+    if(!state.draft.clientName.trim()) errs.push('Client name is required.');
+    var validLines = state.draft.lines.filter(function(l){return l.itemId;});
+    if(validLines.length === 0) errs.push('Add at least one item.');
+    validLines.forEach(function(l){
+      var item = state.items.find(function(i){return i.id === l.itemId;});
+      if(item && l.qty > item.qty){ errs.push('Only ' + item.qty + ' ' + unitLabel(item.unit) + ' of ' + item.name + ' in stock.'); }
+      if(item && l.qty <= 0){ errs.push('Quantity for ' + item.name + ' must be greater than 0.'); }
+    });
+    return errs;
+  }
+
+  async function saveDraftInvoice(){
+    var errs = draftErrors();
+    if(errs.length){ state.formErrors = errs; render(); return; }
+    var lines = state.draft.lines.filter(function(l){return l.itemId;}).map(function(l){
+      var item = state.items.find(function(i){return i.id === l.itemId;});
+      return {itemId:item.id, name:item.name, img:item.img, color:item.color, unit:item.unit, qty:l.qty, price:item.price, amount:item.price*l.qty};
+    });
+    var total = lines.reduce(function(s,l){return s+l.amount;}, 0);
+
+    lines.forEach(function(l){
+      var item = state.items.find(function(i){return i.id === l.itemId;});
+      if(item) item.qty = Math.max(0, item.qty - l.qty);
+    });
+
+    var savedId;
+    if(state.editingInvoiceId){
+      var existing = state.invoices.find(function(i){return i.id === state.editingInvoiceId;});
+      if(existing){
+        existing.date = state.draft.date;
+        existing.clientName = state.draft.clientName.trim();
+        existing.phone = state.draft.phone.trim();
+        existing.address = state.draft.address.trim();
+        existing.lines = lines;
+        existing.total = total;
+        savedId = existing.id;
+      }
+      state.editingInvoiceId = null;
+      state.editingSnapshot = null;
+    } else {
+      var invoice = {
+        id: uid(),
+        invoiceNo: state.draft.invoiceNo,
+        date: state.draft.date,
+        clientName: state.draft.clientName.trim(),
+        phone: state.draft.phone.trim(),
+        address: state.draft.address.trim(),
+        lines: lines,
+        total: total
+      };
+      state.invoices.unshift(invoice);
+      savedId = invoice.id;
+    }
+
+    await saveItems();
+    await saveInvoices();
+    await saveCounter();
+    state.draft = null;
+    state.formErrors = null;
+    state.activeInvoiceId = savedId;
+    state.view = 'invoice-view';
+    render();
+  }
+
+  function cancelDraft(){
+    if(state.editingInvoiceId){
+      var backToId = state.editingInvoiceId;
+      abandonEditIfAny();
+      state.draft = null;
+      state.formErrors = null;
+      state.activeInvoiceId = backToId;
+      state.view = 'invoice-view';
+      render();
+      return;
+    }
+    state.draft = null;
+    state.formErrors = null;
+    goTo('dashboard');
+  }
+
+  function editInvoice(id){
+    var inv = state.invoices.find(function(i){return i.id === id;});
+    if(!inv) return;
+    // put this invoice's quantities back into stock so they can be re-allocated / adjusted
+    inv.lines.forEach(function(l){
+      var item = state.items.find(function(i){return i.id === l.itemId;});
+      if(item) item.qty += l.qty;
+    });
+    saveItems();
+    state.editingInvoiceId = inv.id;
+    state.editingSnapshot = inv.lines.map(function(l){ return {itemId:l.itemId, qty:l.qty}; });
+    state.draft = {
+      invoiceNo: inv.invoiceNo,
+      date: inv.date,
+      clientName: inv.clientName,
+      phone: inv.phone || '',
+      address: inv.address || '',
+      lines: inv.lines.map(function(l){ return {id:uid(), itemId:l.itemId, qty:l.qty}; })
+    };
+    state.formErrors = null;
+    state.view = 'new-invoice';
+    render();
+  }
+
+  function viewInvoice(id){
+    state.activeInvoiceId = id;
+    state.view = 'invoice-view';
+    render();
+  }
+  function confirmDeleteInvoice(id){
+    state.modal = {type:'confirmDeleteInvoice', payload:{id:id}};
+    render();
+  }
+  async function deleteInvoice(id){
+    var inv = state.invoices.find(function(i){return i.id === id;});
+    if(inv){
+      // restore stock for the deleted invoice's lines
+      inv.lines.forEach(function(l){
+        var item = state.items.find(function(i){return i.id === l.itemId;});
+        if(item) item.qty += l.qty;
+      });
+      await saveItems();
+    }
+    state.invoices = state.invoices.filter(function(i){return i.id !== id;});
+    await saveInvoices();
+    state.modal = null;
+    if(state.activeInvoiceId === id){ state.activeInvoiceId = null; state.view = 'invoices'; }
+    render();
+  }
+
+  function viewClientInvoices(clientName){
+    state.clientFilter = clientName;
+    state.view = 'invoices';
+    render();
+  }
+
+  function viewItemOrders(itemId){
+    state.activeItemId = itemId;
+    state.view = 'item-orders';
+    render();
+  }
+
+  /* ================= render helpers ================= */
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function beadsDivider(){
+    var colors = ['var(--gold)','var(--teal)','var(--gold)','var(--maroon)'];
+    var dots = '';
+    for(var i=0;i<28;i++){ dots += '<span style="background:'+colors[i%colors.length]+'"></span>'; }
+    return '<div class="beads">'+dots+'</div>';
+  }
+
+  function renderSidebar(){
+    var navItems = [
+      {id:'dashboard', label:'Dashboard'},
+      {id:'items', label:'Inventory'},
+      {id:'new-invoice', label:'New Invoice'},
+      {id:'invoices', label:'Invoice History'},
+      {id:'clients', label:'Clients'}
+    ];
+    var buttons = navItems.map(function(n){
+      var active = (state.view === n.id) || (state.view === 'invoice-view' && n.id === 'invoices') || (state.view === 'item-orders' && n.id === 'items');
+      return '<button class="'+(active?'active':'')+'" data-nav="'+n.id+'"><span class="dot"></span>'+n.label+'</button>';
+    }).join('');
+    return (
+      '<div class="sidebar no-print">' +
+        '<div class="brand">JSK Creation<small>Beads &amp; Jewellery Supply</small></div>' +
+        '<div class="nav">'+buttons+'</div>' +
+        '<div class="sidebar-foot">' + state.invoices.length + ' invoices billed<br>' + state.items.length + ' items tracked</div>' +
+      '</div>'
+    );
+  }
+
+  function renderDashboard(){
+    var stockValue = state.items.reduce(function(s,i){return s + i.qty*i.price;}, 0);
+    var revenue = state.invoices.reduce(function(s,i){return s + i.total;}, 0);
+    var lowStock = state.items.filter(function(i){return i.qty <= 5;});
+    var recent = state.invoices.slice(0,5);
+
+    var recentRows = recent.map(function(inv){
+      return '<tr>' +
+        '<td class="item-name">'+esc(inv.clientName)+'<div class="muted">'+esc(inv.invoiceNo)+'</div></td>' +
+        '<td>'+fmtDate(inv.date)+'</td>' +
+        '<td class="num">'+fmtMoney(inv.total)+'</td>' +
+        '<td><button class="btn btn-ghost" data-view-invoice="'+inv.id+'" style="padding:6px 12px;font-size:12px;">View</button></td>' +
+      '</tr>';
+    }).join('');
+
+    var lowStockHtml = lowStock.length ? lowStock.map(function(i){
+      return '<tr><td class="item-name" style="display:flex;align-items:center;gap:10px;">'+thumbHTML(i,28)+' '+esc(i.name)+'</td><td><span class="pill low">'+i.qty+' '+unitLabel(i.unit)+' left</span></td></tr>';
+    }).join('') : '<tr><td class="muted" style="padding:14px 10px;">All items are well stocked.</td></tr>';
+
+    return (
+      '<div class="page-head">' +
+        '<div><h1>Dashboard</h1><p>Overview of stock and billing for JSK Creation.</p></div>' +
+        '<button class="btn btn-primary" data-nav="new-invoice">+ New Invoice</button>' +
+      '</div>' +
+      beadsDivider() +
+      '<div class="grid stat-grid">' +
+        '<div class="stat"><div class="label">Items Tracked</div><div class="value">'+state.items.length+'</div></div>' +
+        '<div class="stat"><div class="label">Stock Value</div><div class="value teal">'+fmtMoney(stockValue)+'</div></div>' +
+        '<div class="stat"><div class="label">Invoices Billed</div><div class="value">'+state.invoices.length+'</div></div>' +
+        '<div class="stat"><div class="label">Total Revenue</div><div class="value teal">'+fmtMoney(revenue)+'</div></div>' +
+      '</div>' +
+      '<div class="grid" style="grid-template-columns:1.4fr 1fr; margin-top:28px; align-items:start;">' +
+        '<div class="card">' +
+          '<h3 class="display" style="margin:0 0 12px;font-size:17px;">Recent Invoices</h3>' +
+          (recent.length ? '<div class="table-wrap"><table><tbody>'+recentRows+'</tbody></table></div>' :
+            '<div class="empty"><div class="glyph">🧾</div><h3>No invoices yet</h3><p>Create your first invoice to see it here.</p></div>') +
+        '</div>' +
+        '<div class="card">' +
+          '<h3 class="display" style="margin:0 0 12px;font-size:17px;">Low Stock</h3>' +
+          '<div class="table-wrap"><table><tbody>'+lowStockHtml+'</tbody></table></div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderItems(){
+    var rows = state.items.map(function(i){
+      var low = i.qty <= 5;
+      return '<tr>' +
+        '<td style="width:44px;">'+thumbHTML(i,40)+'</td>' +
+        '<td class="item-name">'+esc(i.name)+'</td>' +
+        '<td>'+i.qty+' '+unitLabel(i.unit)+' '+(low?'<span class="pill low" style="margin-left:8px;">low</span>':'')+'</td>' +
+        '<td class="num">'+fmtMoney(i.price)+' / '+unitLabel(i.unit)+'</td>' +
+        '<td class="num">'+fmtMoney(i.qty*i.price)+'</td>' +
+        '<td style="text-align:right; white-space:nowrap;">' +
+          '<button class="btn btn-ghost" data-view-orders="'+i.id+'" style="padding:6px 12px;font-size:12px;">View Orders</button> ' +
+          '<button class="btn btn-ghost" data-edit-item="'+i.id+'" style="padding:6px 12px;font-size:12px;">Edit</button> ' +
+          '<button class="btn btn-danger" data-del-item="'+i.id+'" style="padding:6px 12px;font-size:12px;">Delete</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+
+    return (
+      '<div class="page-head">' +
+        '<div><h1>Inventory</h1><p>Items you stock, their quantity on hand, and price per piece.</p></div>' +
+        '<button class="btn btn-gold" data-add-item>+ Add Item</button>' +
+      '</div>' +
+      beadsDivider() +
+      '<div class="card">' +
+      (state.items.length ?
+        '<div class="table-wrap"><table><thead><tr><th></th><th>Item Name</th><th>Quantity We Have</th><th>Price per pc</th><th>Stock Value</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+        : '<div class="empty"><div class="glyph">📦</div><h3>No items yet</h3><p>Add your first item to start building invoices.</p></div>') +
+      '</div>'
+    );
+  }
+
+  function renderNewInvoice(){
+    if(!state.draft) startDraft();
+    var d = state.draft;
+
+    var lineRows = d.lines.map(function(l){
+      var item = state.items.find(function(i){return i.id === l.itemId;});
+      var amount = item ? item.price * l.qty : 0;
+      var opts = '<option value="">Select item…</option>' + state.items.map(function(i){
+        return '<option value="'+i.id+'" '+(i.id===l.itemId?'selected':'')+'>'+esc(i.name)+' ('+i.qty+' '+unitLabel(i.unit)+' left)</option>';
+      }).join('');
+      return (
+        '<div class="line-item-row">' +
+          '<select data-line="'+l.id+'" data-field="itemId">'+opts+'</select>' +
+          '<input type="number" min="0" step="1" value="'+l.qty+'" data-line="'+l.id+'" data-field="qty">' +
+          '<div class="muted" style="text-align:right;">'+(item?fmtMoney(item.price)+'/'+unitLabel(item.unit):'—')+'</div>' +
+          '<div class="amt">'+fmtMoney(amount)+'</div>' +
+          '<button class="remove-row" data-remove-line="'+l.id+'" title="Remove">✕</button>' +
+        '</div>'
+      );
+    }).join('');
+
+    var errs = state.formErrors;
+    var errHtml = (errs && errs.length) ? (
+      '<div style="background:#FBEEEA;border:1px solid #EAD3CC;color:var(--danger);padding:12px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;">' +
+        errs.map(esc).join('<br>') +
+      '</div>'
+    ) : '';
+
+    return (
+      '<div class="page-head">' +
+        '<div><h1>'+(state.editingInvoiceId?'Edit Invoice':'New Invoice')+'</h1><p>Invoice '+esc(d.invoiceNo)+' · '+fmtDate(d.date)+'</p></div>' +
+        '<div class="btn-row">' +
+          '<button class="btn btn-ghost" data-cancel-draft>Cancel</button>' +
+          '<button class="btn btn-primary" data-save-draft>'+(state.editingInvoiceId?'Save Changes':'Save &amp; View Invoice')+'</button>' +
+        '</div>' +
+      '</div>' +
+      beadsDivider() +
+      errHtml +
+      '<div class="grid" style="grid-template-columns:1fr 1fr;">' +
+        '<div class="card">' +
+          '<h3 class="display" style="margin:0 0 14px;font-size:16px;">Client Details</h3>' +
+          '<div class="field"><label>Client Name</label><div class="icon-field">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+            '<input type="text" data-draft-field="clientName" value="'+esc(d.clientName)+'" placeholder="e.g. Yash Gota">' +
+          '</div></div>' +
+          '<div class="field-row">' +
+            '<div class="field"><label>Phone Number</label><div class="icon-field">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>' +
+              '<input type="text" data-draft-field="phone" value="'+esc(d.phone)+'" placeholder="03xx-xxxxxxx">' +
+            '</div></div>' +
+            '<div class="field"><label>Date</label><div class="icon-field">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>' +
+              '<input type="date" data-draft-field="date" value="'+d.date+'">' +
+            '</div></div>' +
+          '</div>' +
+          '<div class="field"><label>Client Address</label><div class="icon-field">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>' +
+            '<input type="text" data-draft-field="address" value="'+esc(d.address)+'" placeholder="Shop / city">' +
+          '</div></div>' +
+        '</div>' +
+        '<div class="card">' +
+          '<h3 class="display" style="margin:0 0 14px;font-size:16px;">Invoice Meta</h3>' +
+          '<div class="field"><label>Invoice No.</label><div class="prefix-input"><span class="prefix-tag">JSK</span><input type="text" value="'+esc(d.invoiceNo.replace(/^JSK-/,''))+'" disabled></div></div>' +
+          '<p class="field-hint">Invoice numbers are generated automatically in sequence.</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="card" style="margin-top:20px;">' +
+        '<h3 class="display" style="margin:0 0 14px;font-size:16px;">Items</h3>' +
+        (state.items.length ?
+          ('<div class="line-item-row muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;"><div>Item</div><div>Qty</div><div style="text-align:right;">Price</div><div style="text-align:right;">Amount</div><div></div></div>' +
+          lineRows +
+          '<button class="add-row-btn" data-add-line>+ Add another item</button>')
+          : '<div class="empty"><div class="glyph">📦</div><h3>No items in inventory</h3><p>Add items in the Inventory tab first.</p></div>') +
+        '<div class="totals-box"><div class="row"><span class="lbl">Total Price</span><span class="amt">'+fmtMoney(draftTotal())+'</span></div></div>' +
+      '</div>'
+    );
+  }
+
+  function renderInvoicesList(){
+    var list = state.invoices;
+    var filterChip = '';
+    if(state.clientFilter){
+      list = list.filter(function(inv){ return inv.clientName === state.clientFilter; });
+      filterChip = '<div class="filter-chip">Showing invoices for '+esc(state.clientFilter)+' <button data-clear-filter>✕</button></div>';
+    }
+
+    var rows = list.map(function(inv){
+      return '<tr>' +
+        '<td class="item-name">'+esc(inv.invoiceNo)+'</td>' +
+        '<td>'+esc(inv.clientName)+'<div class="muted">'+esc(inv.phone||'')+'</div></td>' +
+        '<td>'+fmtDate(inv.date)+'</td>' +
+        '<td>'+inv.lines.length+' item(s)</td>' +
+        '<td class="num">'+fmtMoney(inv.total)+'</td>' +
+        '<td style="text-align:right; white-space:nowrap;">' +
+          '<button class="btn btn-ghost" data-view-invoice="'+inv.id+'" style="padding:6px 12px;font-size:12px;">View</button> ' +
+          '<button class="btn btn-ghost" data-edit-invoice="'+inv.id+'" style="padding:6px 12px;font-size:12px;">Edit</button> ' +
+          '<button class="btn btn-danger" data-del-invoice="'+inv.id+'" style="padding:6px 12px;font-size:12px;">Delete</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+
+    return (
+      '<div class="page-head">' +
+        '<div><h1>Invoice History</h1><p>Every invoice billed to your clients.</p></div>' +
+        '<button class="btn btn-primary" data-nav="new-invoice">+ New Invoice</button>' +
+      '</div>' +
+      beadsDivider() +
+      filterChip +
+      '<div class="card">' +
+      (list.length ?
+        '<div class="table-wrap"><table><thead><tr><th>Invoice No.</th><th>Client</th><th>Date</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+        : '<div class="empty"><div class="glyph">🧾</div><h3>No invoices yet</h3><p>Billed invoices will appear here.</p></div>') +
+      '</div>'
+    );
+  }
+
+  function renderClients(){
+    var map = {};
+    state.invoices.forEach(function(inv){
+      var key = inv.clientName.trim().toLowerCase();
+      if(!map[key]){
+        map[key] = {name: inv.clientName, phone: inv.phone, address: inv.address, qty:0, total:0, invoices:0, lastDate: inv.date};
+      }
+      var c = map[key];
+      c.qty += inv.lines.reduce(function(s,l){return s+l.qty;}, 0);
+      c.total += inv.total;
+      c.invoices += 1;
+      if(inv.phone && !c.phone) c.phone = inv.phone;
+      if(inv.date > c.lastDate){ c.lastDate = inv.date; }
+    });
+    var clients = Object.keys(map).map(function(k){return map[k];}).sort(function(a,b){return b.total - a.total;});
+
+    var rows = clients.map(function(c){
+      return '<tr>' +
+        '<td class="item-name" style="display:flex;align-items:center;gap:10px;">'+thumbHTML({name:c.name},34)+' <div>'+esc(c.name)+'<div class="muted">'+esc(c.phone||'')+'</div></div></td>' +
+        '<td>'+c.invoices+'</td>' +
+        '<td>'+c.qty+' units</td>' +
+        '<td class="num">'+fmtMoney(c.total)+'</td>' +
+        '<td>'+fmtDate(c.lastDate)+'</td>' +
+        '<td style="text-align:right;"><button class="btn btn-ghost" data-view-client="'+esc(c.name)+'" style="padding:6px 12px;font-size:12px;">View Invoices</button></td>' +
+      '</tr>';
+    }).join('');
+
+    return (
+      '<div class="page-head">' +
+        '<div><h1>Clients</h1><p>Everyone you have billed, with total quantity and spend.</p></div>' +
+      '</div>' +
+      beadsDivider() +
+      '<div class="card">' +
+      (clients.length ?
+        '<div class="table-wrap"><table><thead><tr><th>Client</th><th>Invoices</th><th>Total Quantity</th><th>Total Spent</th><th>Last Billed</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+        : '<div class="empty"><div class="glyph">🧑‍🤝‍🧑</div><h3>No clients yet</h3><p>Clients appear here automatically once you save an invoice.</p></div>') +
+      '</div>'
+    );
+  }
+
+  function renderItemOrders(){
+    var item = state.items.find(function(i){return i.id === state.activeItemId;});
+    if(!item){
+      return '<div class="empty"><div class="glyph">📦</div><h3>Item not found</h3></div>';
+    }
+
+    var byClient = {};
+    state.invoices.forEach(function(inv){
+      inv.lines.forEach(function(l){
+        if(l.itemId !== item.id) return;
+        var key = inv.clientName.trim().toLowerCase();
+        if(!byClient[key]){ byClient[key] = {name: inv.clientName, qty:0, total:0, orders:0}; }
+        byClient[key].qty += l.qty;
+        byClient[key].total += l.amount;
+        byClient[key].orders += 1;
+      });
+    });
+    var clients = Object.keys(byClient).map(function(k){return byClient[k];}).sort(function(a,b){return b.total - a.total;});
+    var grandTotal = clients.reduce(function(s,c){return s+c.total;}, 0);
+    var grandQty = clients.reduce(function(s,c){return s+c.qty;}, 0);
+
+    var rows = clients.map(function(c){
+      return '<tr>' +
+        '<td class="item-name" style="display:flex;align-items:center;gap:10px;">'+thumbHTML({name:c.name},32)+' '+esc(c.name)+'</td>' +
+        '<td>'+c.qty+' '+unitLabel(item.unit)+'</td>' +
+        '<td class="num">'+fmtMoney(c.total)+'</td>' +
+      '</tr>';
+    }).join('');
+
+    return (
+      '<div class="page-head no-print">' +
+        '<div><h1>Item Orders</h1><p>Everyone who has ordered '+esc(item.name)+', and how much.</p></div>' +
+        '<div class="btn-row">' +
+          '<button class="btn btn-ghost" data-nav="items">Back to Inventory</button>' +
+          '<button class="btn btn-primary" data-new-order-item="'+item.id+'">+ New Order for '+esc(item.name)+'</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="invoice-sheet">' +
+        '<div class="inv-top">' +
+          '<div class="inv-brand">JSK Creation<small>Beads &amp; Jewellery Supply</small></div>' +
+        '</div>' +
+        '<div class="inv-client" style="display:flex; align-items:center; gap:14px; margin-top:22px;">' +
+          thumbHTML(item, 56) +
+          '<div>' +
+            '<h2 style="margin:0;">'+esc(item.name)+'</h2>' +
+            '<div class="sub">'+item.qty+' '+unitLabel(item.unit)+' in stock &middot; '+fmtMoney(item.price)+' per '+unitLabel(item.unit)+'</div>' +
+          '</div>' +
+        '</div>' +
+        beadsDivider() +
+        (clients.length ?
+          ('<div class="inv-items"><div class="table-wrap">' +
+            '<table><thead><tr><th>Clients</th><th>Quantity</th><th>Total Price</th></tr></thead><tbody>'+rows+'</tbody></table>' +
+          '</div></div>' +
+          '<div class="totals-box"><div class="row"><span class="lbl">Total Price</span><span class="amt">'+fmtMoney(grandTotal)+'</span></div></div>' +
+          '<p class="muted" style="margin-top:6px;">'+grandQty+' '+unitLabel(item.unit)+' ordered in total across '+clients.length+' client(s).</p>')
+          : '<div class="empty"><div class="glyph">🧾</div><h3>No orders yet</h3><p>Once this item appears on a saved invoice, buyers will be listed here.</p></div>') +
+      '</div>'
+    );
+  }
+
+  function renderInvoiceView(){
+    var inv = state.invoices.find(function(i){return i.id === state.activeInvoiceId;});
+    if(!inv){ return '<div class="empty"><div class="glyph">🧾</div><h3>Invoice not found</h3></div>'; }
+    var rows = inv.lines.map(function(l){
+      return '<tr>' +
+        '<td><div class="row-item">'+thumbHTML(l,28)+' '+esc(l.name)+'</div></td>' +
+        '<td class="qty">'+l.qty+' '+unitLabel(l.unit)+'</td>' +
+        '<td class="amt">'+fmtMoney(l.price)+'</td>' +
+        '<td class="amt">'+fmtMoney(l.amount)+'</td>' +
+      '</tr>';
+    }).join('');
+
+    return (
+      '<div class="page-head no-print">' +
+        '<div><h1>Invoice</h1><p>'+esc(inv.invoiceNo)+'</p></div>' +
+        '<div class="btn-row">' +
+          '<button class="btn btn-ghost" data-nav="invoices">Back to History</button>' +
+          '<button class="btn btn-ghost" data-edit-invoice="'+inv.id+'">Edit Invoice</button>' +
+          '<button class="btn btn-gold" data-print>Print / Save PDF</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="invoice-sheet">' +
+        '<div class="inv-top">' +
+          '<div class="inv-brand">JSK Creation<small>Beads &amp; Jewellery Supply</small></div>' +
+          '<div class="inv-meta">Invoice No.<br><span class="num">'+esc(inv.invoiceNo)+'</span><br>Date: '+fmtDate(inv.date)+'</div>' +
+        '</div>' +
+        beadsDivider() +
+        '<div class="inv-client">' +
+          '<h2>'+esc(inv.clientName)+'</h2>' +
+          '<div class="sub">'+esc(inv.phone||'')+(inv.phone && inv.address ? ' · ' : '')+esc(inv.address||'')+'</div>' +
+        '</div>' +
+        '<div class="inv-items table-wrap">' +
+          '<table><thead><tr><th>Item</th><th class="qty">Quantity</th><th class="amt">Price</th><th class="amt">Amount</th></tr></thead><tbody>'+rows+'</tbody></table>' +
+        '</div>' +
+        '<div class="totals-box"><div class="row"><span class="lbl">Total Price</span><span class="amt">'+fmtMoney(inv.total)+'</span></div></div>' +
+      '</div>'
+    );
+  }
+
+  /* ================= modal ================= */
+  function renderModal(){
+    if(!state.modal) return '';
+    if(state.modal.type === 'item'){
+      var it = state.modal.payload;
+      var isEdit = !!it.id;
+      return (
+        '<div class="modal-backdrop" data-close-modal>' +
+          '<div class="modal" onclick="event.stopPropagation()">' +
+            '<h2>'+(isEdit?'Edit Item':'Add Item')+'</h2>' +
+            '<p class="muted" style="margin-top:0;">Track it in your inventory so it can be billed on invoices.</p>' +
+            '<form id="item-form">' +
+              '<div class="field"><label>Item Name</label><input name="name" type="text" value="'+esc(it.name)+'" placeholder="e.g. Kundan" required></div>' +
+              '<div class="field-row">' +
+                '<div class="field"><label>Quantity We Have</label><input name="qty" type="number" min="0" step="1" value="'+it.qty+'"></div>' +
+                '<div class="field"><label>Unit</label><select name="unit">' +
+                  '<option value="pc" '+((it.unit||'pc')==='pc'?'selected':'')+'>Per pc</option>' +
+                  '<option value="pair" '+(it.unit==='pair'?'selected':'')+'>Per pair</option>' +
+                  '<option value="packet" '+(it.unit==='packet'?'selected':'')+'>Per packet</option>' +
+                  '<option value="yard" '+(it.unit==='yard'?'selected':'')+'>Per yard</option>' +
+                  '<option value="gram" '+(it.unit==='gram'?'selected':'')+'>Per gram</option>' +
+                '</select></div>' +
+              '</div>' +
+              '<div class="field"><label>Price</label><div class="prefix-input"><span class="prefix-tag">Rs.</span><input name="price" type="number" min="0" step="1" value="'+it.price+'"></div></div>' +
+              '<div class="field"><label>Item Picture (image URL, optional)</label><input name="img" type="text" value="'+esc(it.img||'')+'" placeholder="https://…"></div>' +
+              '<p class="field-hint">Leave blank to use an automatic monogram badge instead.</p>' +
+              '<div class="modal-actions">' +
+                '<button type="button" class="btn btn-ghost" data-close-modal>Cancel</button>' +
+                '<button type="submit" class="btn btn-primary">'+(isEdit?'Save Changes':'Add Item')+'</button>' +
+              '</div>' +
+            '</form>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+    if(state.modal.type === 'confirmDeleteItem'){
+      var item = state.items.find(function(i){return i.id === state.modal.payload.id;});
+      return (
+        '<div class="modal-backdrop" data-close-modal>' +
+          '<div class="modal" onclick="event.stopPropagation()">' +
+            '<h2>Delete Item?</h2>' +
+            '<p class="muted">This removes "'+esc(item?item.name:'')+'" from inventory. Past invoices are not affected.</p>' +
+            '<div class="modal-actions">' +
+              '<button class="btn btn-ghost" data-close-modal>Cancel</button>' +
+              '<button class="btn btn-danger" style="background:var(--danger);color:#fff;border:none;" data-confirm-del-item="'+state.modal.payload.id+'">Delete</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+    if(state.modal.type === 'confirmDeleteInvoice'){
+      return (
+        '<div class="modal-backdrop" data-close-modal>' +
+          '<div class="modal" onclick="event.stopPropagation()">' +
+            '<h2>Delete Invoice?</h2>' +
+            '<p class="muted">This permanently removes the invoice from history.</p>' +
+            '<div class="modal-actions">' +
+              '<button class="btn btn-ghost" data-close-modal>Cancel</button>' +
+              '<button class="btn btn-danger" style="background:var(--danger);color:#fff;border:none;" data-confirm-del-invoice="'+state.modal.payload.id+'">Delete</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+    return '';
+  }
+
+  /* ================= root render ================= */
+  function render(){
+    var body = '';
+    switch(state.view){
+      case 'items': body = renderItems(); break;
+      case 'new-invoice': body = renderNewInvoice(); break;
+      case 'invoices': body = renderInvoicesList(); break;
+      case 'clients': body = renderClients(); break;
+      case 'item-orders': body = renderItemOrders(); break;
+      case 'invoice-view': body = renderInvoiceView(); break;
+      default: body = renderDashboard();
+    }
+    var html = renderSidebar() + '<div class="main">' + body + '</div>' + renderModal();
+    document.getElementById('app').innerHTML = html;
+    bindEvents();
+  }
+
+  /* ================= events ================= */
+  function bindEvents(){
+    var root = document.getElementById('app');
+
+    root.querySelectorAll('[data-nav]').forEach(function(el){
+      el.addEventListener('click', function(){ goTo(el.getAttribute('data-nav')); });
+    });
+    root.querySelectorAll('[data-view-invoice]').forEach(function(el){
+      el.addEventListener('click', function(){ viewInvoice(el.getAttribute('data-view-invoice')); });
+    });
+    root.querySelectorAll('[data-view-client]').forEach(function(el){
+      el.addEventListener('click', function(){ viewClientInvoices(el.getAttribute('data-view-client')); });
+    });
+    root.querySelectorAll('[data-view-orders]').forEach(function(el){
+      el.addEventListener('click', function(){ viewItemOrders(el.getAttribute('data-view-orders')); });
+    });
+    root.querySelectorAll('[data-new-order-item]').forEach(function(el){
+      el.addEventListener('click', function(){ startDraftForItem(el.getAttribute('data-new-order-item')); });
+    });
+    root.querySelectorAll('[data-edit-invoice]').forEach(function(el){
+      el.addEventListener('click', function(){ editInvoice(el.getAttribute('data-edit-invoice')); });
+    });
+    var clearFilter = root.querySelector('[data-clear-filter]');
+    if(clearFilter) clearFilter.addEventListener('click', function(){ state.clientFilter = null; render(); });
+
+    var addItemBtn = root.querySelector('[data-add-item]');
+    if(addItemBtn) addItemBtn.addEventListener('click', function(){ openItemModal(null); });
+    root.querySelectorAll('[data-edit-item]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var item = state.items.find(function(i){return i.id === el.getAttribute('data-edit-item');});
+        openItemModal(item);
+      });
+    });
+    root.querySelectorAll('[data-del-item]').forEach(function(el){
+      el.addEventListener('click', function(){ confirmDeleteItem(el.getAttribute('data-del-item')); });
+    });
+    root.querySelectorAll('[data-del-invoice]').forEach(function(el){
+      el.addEventListener('click', function(){ confirmDeleteInvoice(el.getAttribute('data-del-invoice')); });
+    });
+    var printBtn = root.querySelector('[data-print]');
+    if(printBtn) printBtn.addEventListener('click', function(){ window.print(); });
+
+    root.querySelectorAll('[data-close-modal]').forEach(function(el){
+      el.addEventListener('click', function(){ state.modal = null; render(); });
+    });
+    var itemForm = document.getElementById('item-form');
+    if(itemForm){
+      itemForm.addEventListener('submit', function(e){ e.preventDefault(); submitItemModal(itemForm); });
+    }
+    var confirmDelItem = root.querySelector('[data-confirm-del-item]');
+    if(confirmDelItem) confirmDelItem.addEventListener('click', function(){ deleteItem(confirmDelItem.getAttribute('data-confirm-del-item')); });
+    var confirmDelInvoice = root.querySelector('[data-confirm-del-invoice]');
+    if(confirmDelInvoice) confirmDelInvoice.addEventListener('click', function(){ deleteInvoice(confirmDelInvoice.getAttribute('data-confirm-del-invoice')); });
+
+    var cancelBtn = root.querySelector('[data-cancel-draft]');
+    if(cancelBtn) cancelBtn.addEventListener('click', cancelDraft);
+    var saveBtn = root.querySelector('[data-save-draft]');
+    if(saveBtn) saveBtn.addEventListener('click', saveDraftInvoice);
+    var addLineBtn = root.querySelector('[data-add-line]');
+    if(addLineBtn) addLineBtn.addEventListener('click', addDraftLine);
+    root.querySelectorAll('[data-remove-line]').forEach(function(el){
+      el.addEventListener('click', function(){ removeDraftLine(el.getAttribute('data-remove-line')); });
+    });
+    root.querySelectorAll('[data-line]').forEach(function(el){
+      el.addEventListener('change', function(){
+        updateDraftLine(el.getAttribute('data-line'), el.getAttribute('data-field'), el.value);
+      });
+    });
+    root.querySelectorAll('[data-draft-field]').forEach(function(el){
+      el.addEventListener('input', function(){ updateDraftField(el.getAttribute('data-draft-field'), el.value); });
+      el.addEventListener('change', function(){ updateDraftField(el.getAttribute('data-draft-field'), el.value); });
+    });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
