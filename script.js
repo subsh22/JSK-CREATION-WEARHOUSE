@@ -1,13 +1,38 @@
+window.firebaseReady = (async function(){
+  try{
+    var appMod = await import("https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js");
+    var fsMod = await import("https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js");
+    var firebaseConfig = {
+      apiKey: "AIzaSyAP1W9aEd6alEs-3Ac2s36ecRT6sIkzkFs",
+      authDomain: "jsk-creation.firebaseapp.com",
+      projectId: "jsk-creation",
+      storageBucket: "jsk-creation.firebasestorage.app",
+      messagingSenderId: "682729907422",
+      appId: "1:682729907422:web:7a2b9a127ef70a4e0e8e4f",
+      measurementId: "G-1QGH1N1EMR"
+    };
+    var app = appMod.initializeApp(firebaseConfig);
+    var db = fsMod.getFirestore(app);
+    return { db: db, doc: fsMod.doc, getDoc: fsMod.getDoc, setDoc: fsMod.setDoc, ok:true };
+  }catch(e){
+    console.error('Firebase init failed, falling back to local storage only.', e);
+    return { ok:false };
+  }
+})();
+
 (function(){
   "use strict";
- 
+
+
   /* ================= persistence layer =================
      Order of preference: window.storage (claude.ai artifact
-     sandbox) -> localStorage (standalone browser / hosted use)
+     sandbox) -> Firebase Firestore (cross-device cloud sync)
+     -> localStorage (offline cache / standalone fallback)
      -> in-memory object (last resort, e.g. private/blocked storage) */
   var memoryFallback = {};
   var LS_PREFIX = 'jsk-creation:';
- 
+  var FIRESTORE_COLLECTION = 'jsk-creation';
+
   function lsGet(key){
     try{
       var raw = window.localStorage.getItem(LS_PREFIX + key);
@@ -18,7 +43,7 @@
     try{ window.localStorage.setItem(LS_PREFIX + key, JSON.stringify(value)); return true; }
     catch(e){ return false; }
   }
- 
+
   async function storeGet(key, fallback){
     try{
       if(window.storage){
@@ -26,6 +51,18 @@
         if(res) return JSON.parse(res.value);
       }
     }catch(e){ /* key not found in window.storage, keep looking */ }
+    try{
+      var fb = await window.firebaseReady;
+      if(fb && fb.ok){
+        var ref = fb.doc(fb.db, FIRESTORE_COLLECTION, key);
+        var snap = await fb.getDoc(ref);
+        if(snap.exists()){
+          var val = snap.data().value;
+          lsSet(key, val); // keep a local cache too
+          return val;
+        }
+      }
+    }catch(e){ console.warn('Firestore read failed for', key, e); }
     var ls = lsGet(key);
     if(ls !== undefined) return ls;
     return memoryFallback.hasOwnProperty(key) ? memoryFallback[key] : fallback;
@@ -36,8 +73,15 @@
     try{
       if(window.storage){ await window.storage.set(key, JSON.stringify(value), false); }
     }catch(e){ /* localStorage already has it as a safety net */ }
+    try{
+      var fb = await window.firebaseReady;
+      if(fb && fb.ok){
+        var ref = fb.doc(fb.db, FIRESTORE_COLLECTION, key);
+        await fb.setDoc(ref, { value: value });
+      }
+    }catch(e){ console.warn('Firestore write failed for', key, e); }
   }
- 
+
   /* ================= state ================= */
   var state = {
     view: 'dashboard',
@@ -53,7 +97,7 @@
     editingInvoiceId: null,
     editingSnapshot: null
   };
- 
+
   var PALETTE = ['#6C1E3C','#0F6E6E','#C9973B','#3E5C76','#7A4A9E','#1F6E43','#A23B2E','#2E4A6B'];
   function colorFor(name){
     var str = (name || '?');
@@ -67,7 +111,7 @@
     if(parts.length === 1) return parts[0].slice(0,2).toUpperCase();
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
- 
+
   var UNIT_LABELS = {pc:'pc', pair:'pair', packet:'packet', yard:'yard', gram:'gram'};
   function unitLabel(unit){ return UNIT_LABELS[unit] || 'pc'; }
   function fmtMoney(n){
@@ -80,7 +124,7 @@
     return d.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
   }
   function uid(){ return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
- 
+
   /* thumbnail markup for an item/line: real picture if provided, else a monogram badge */
   function thumbHTML(entity, size){
     size = size || 36;
@@ -91,7 +135,7 @@
     var bg = entity.color || colorFor(entity.name);
     return '<div class="thumb" style="'+style+';background:'+bg+';">'+initials(entity.name)+'</div>';
   }
- 
+
   /* ================= init ================= */
   async function init(){
     var items = await storeGet('items', null);
@@ -110,11 +154,11 @@
     state.invoiceCounter = counter;
     render();
   }
- 
+
   async function saveItems(){ await storeSet('items', state.items); }
   async function saveInvoices(){ await storeSet('invoices', state.invoices); }
   async function saveCounter(){ await storeSet('invoiceCounter', state.invoiceCounter); }
- 
+
   /* ================= navigation ================= */
   function abandonEditIfAny(){
     if(state.editingInvoiceId && state.editingSnapshot){
@@ -127,7 +171,7 @@
     state.editingInvoiceId = null;
     state.editingSnapshot = null;
   }
- 
+
   function goTo(view){
     if(state.view === 'new-invoice' && view !== 'new-invoice' && state.editingInvoiceId){
       abandonEditIfAny();
@@ -139,7 +183,7 @@
     if(view !== 'invoices'){ state.clientFilter = null; }
     render();
   }
- 
+
   function startDraft(){
     state.invoiceCounter += 1;
     state.draft = {
@@ -151,7 +195,7 @@
       lines: [ {id:uid(), itemId:'', qty:1} ]
     };
   }
- 
+
   function startDraftForItem(itemId){
     state.invoiceCounter += 1;
     state.draft = {
@@ -167,7 +211,7 @@
     state.view = 'new-invoice';
     render();
   }
- 
+
   /* ================= item CRUD ================= */
   function openItemModal(item){
     state.modal = {type:'item', payload: item ? Object.assign({}, item) : {id:null, name:'', img:'', qty:0, price:0, unit:'pc'}};
@@ -202,7 +246,7 @@
     state.modal = null;
     render();
   }
- 
+
   /* ================= invoice draft editing ================= */
   function addDraftLine(){
     state.draft.lines.push({id:uid(), itemId:'', qty:1});
@@ -223,7 +267,7 @@
   function updateDraftField(field, value){
     state.draft[field] = value;
   }
- 
+
   function draftTotal(){
     var total = 0;
     state.draft.lines.forEach(function(l){
@@ -232,7 +276,7 @@
     });
     return total;
   }
- 
+
   function draftErrors(){
     var errs = [];
     if(!state.draft.clientName.trim()) errs.push('Client name is required.');
@@ -245,7 +289,7 @@
     });
     return errs;
   }
- 
+
   async function saveDraftInvoice(){
     var errs = draftErrors();
     if(errs.length){ state.formErrors = errs; render(); return; }
@@ -254,12 +298,12 @@
       return {itemId:item.id, name:item.name, img:item.img, color:item.color, unit:item.unit, qty:l.qty, price:item.price, amount:item.price*l.qty};
     });
     var total = lines.reduce(function(s,l){return s+l.amount;}, 0);
- 
+
     lines.forEach(function(l){
       var item = state.items.find(function(i){return i.id === l.itemId;});
       if(item) item.qty = Math.max(0, item.qty - l.qty);
     });
- 
+
     var savedId;
     if(state.editingInvoiceId){
       var existing = state.invoices.find(function(i){return i.id === state.editingInvoiceId;});
@@ -288,7 +332,7 @@
       state.invoices.unshift(invoice);
       savedId = invoice.id;
     }
- 
+
     await saveItems();
     await saveInvoices();
     await saveCounter();
@@ -298,7 +342,7 @@
     state.view = 'invoice-view';
     render();
   }
- 
+
   function cancelDraft(){
     if(state.editingInvoiceId){
       var backToId = state.editingInvoiceId;
@@ -314,7 +358,7 @@
     state.formErrors = null;
     goTo('dashboard');
   }
- 
+
   function editInvoice(id){
     var inv = state.invoices.find(function(i){return i.id === id;});
     if(!inv) return;
@@ -338,7 +382,7 @@
     state.view = 'new-invoice';
     render();
   }
- 
+
   function viewInvoice(id){
     state.activeInvoiceId = id;
     state.view = 'invoice-view';
@@ -364,33 +408,33 @@
     if(state.activeInvoiceId === id){ state.activeInvoiceId = null; state.view = 'invoices'; }
     render();
   }
- 
+
   function viewClientInvoices(clientName){
     state.clientFilter = clientName;
     state.view = 'invoices';
     render();
   }
- 
+
   function viewItemOrders(itemId){
     state.activeItemId = itemId;
     state.view = 'item-orders';
     render();
   }
- 
+
   /* ================= render helpers ================= */
   function esc(s){
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
     });
   }
- 
+
   function beadsDivider(){
     var colors = ['var(--gold)','var(--teal)','var(--gold)','var(--maroon)'];
     var dots = '';
     for(var i=0;i<28;i++){ dots += '<span style="background:'+colors[i%colors.length]+'"></span>'; }
     return '<div class="beads">'+dots+'</div>';
   }
- 
+
   function renderSidebar(){
     var navItems = [
       {id:'dashboard', label:'Dashboard'},
@@ -411,13 +455,13 @@
       '</div>'
     );
   }
- 
+
   function renderDashboard(){
     var stockValue = state.items.reduce(function(s,i){return s + i.qty*i.price;}, 0);
     var revenue = state.invoices.reduce(function(s,i){return s + i.total;}, 0);
     var lowStock = state.items.filter(function(i){return i.qty <= 5;});
     var recent = state.invoices.slice(0,5);
- 
+
     var recentRows = recent.map(function(inv){
       return '<tr>' +
         '<td class="item-name">'+esc(inv.clientName)+'<div class="muted">'+esc(inv.invoiceNo)+'</div></td>' +
@@ -426,11 +470,11 @@
         '<td><button class="btn btn-ghost" data-view-invoice="'+inv.id+'" style="padding:6px 12px;font-size:12px;">View</button></td>' +
       '</tr>';
     }).join('');
- 
+
     var lowStockHtml = lowStock.length ? lowStock.map(function(i){
       return '<tr><td class="item-name" style="display:flex;align-items:center;gap:10px;">'+thumbHTML(i,28)+' '+esc(i.name)+'</td><td><span class="pill low">'+i.qty+' '+unitLabel(i.unit)+' left</span></td></tr>';
     }).join('') : '<tr><td class="muted" style="padding:14px 10px;">All items are well stocked.</td></tr>';
- 
+
     return (
       '<div class="page-head">' +
         '<div><h1>Dashboard</h1><p>Overview of stock and billing for JSK Creation.</p></div>' +
@@ -456,7 +500,7 @@
       '</div>'
     );
   }
- 
+
   function renderItems(){
     var rows = state.items.map(function(i){
       var low = i.qty <= 5;
@@ -473,7 +517,7 @@
         '</td>' +
       '</tr>';
     }).join('');
- 
+
     return (
       '<div class="page-head">' +
         '<div><h1>Inventory</h1><p>Items you stock, their quantity on hand, and price per piece.</p></div>' +
@@ -487,11 +531,11 @@
       '</div>'
     );
   }
- 
+
   function renderNewInvoice(){
     if(!state.draft) startDraft();
     var d = state.draft;
- 
+
     var lineRows = d.lines.map(function(l){
       var item = state.items.find(function(i){return i.id === l.itemId;});
       var amount = item ? item.price * l.qty : 0;
@@ -508,14 +552,14 @@
         '</div>'
       );
     }).join('');
- 
+
     var errs = state.formErrors;
     var errHtml = (errs && errs.length) ? (
       '<div style="background:#FBEEEA;border:1px solid #EAD3CC;color:var(--danger);padding:12px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;">' +
         errs.map(esc).join('<br>') +
       '</div>'
     ) : '';
- 
+
     return (
       '<div class="page-head">' +
         '<div><h1>'+(state.editingInvoiceId?'Edit Invoice':'New Invoice')+'</h1><p>Invoice '+esc(d.invoiceNo)+' · '+fmtDate(d.date)+'</p></div>' +
@@ -565,7 +609,7 @@
       '</div>'
     );
   }
- 
+
   function renderInvoicesList(){
     var list = state.invoices;
     var filterChip = '';
@@ -573,7 +617,7 @@
       list = list.filter(function(inv){ return inv.clientName === state.clientFilter; });
       filterChip = '<div class="filter-chip">Showing invoices for '+esc(state.clientFilter)+' <button data-clear-filter>✕</button></div>';
     }
- 
+
     var rows = list.map(function(inv){
       return '<tr>' +
         '<td class="item-name">'+esc(inv.invoiceNo)+'</td>' +
@@ -588,7 +632,7 @@
         '</td>' +
       '</tr>';
     }).join('');
- 
+
     return (
       '<div class="page-head">' +
         '<div><h1>Invoice History</h1><p>Every invoice billed to your clients.</p></div>' +
@@ -603,7 +647,7 @@
       '</div>'
     );
   }
- 
+
   function renderClients(){
     var map = {};
     state.invoices.forEach(function(inv){
@@ -619,7 +663,7 @@
       if(inv.date > c.lastDate){ c.lastDate = inv.date; }
     });
     var clients = Object.keys(map).map(function(k){return map[k];}).sort(function(a,b){return b.total - a.total;});
- 
+
     var rows = clients.map(function(c){
       return '<tr>' +
         '<td class="item-name" style="display:flex;align-items:center;gap:10px;">'+thumbHTML({name:c.name},34)+' <div>'+esc(c.name)+'<div class="muted">'+esc(c.phone||'')+'</div></div></td>' +
@@ -630,7 +674,7 @@
         '<td style="text-align:right;"><button class="btn btn-ghost" data-view-client="'+esc(c.name)+'" style="padding:6px 12px;font-size:12px;">View Invoices</button></td>' +
       '</tr>';
     }).join('');
- 
+
     return (
       '<div class="page-head">' +
         '<div><h1>Clients</h1><p>Everyone you have billed, with total quantity and spend.</p></div>' +
@@ -643,13 +687,13 @@
       '</div>'
     );
   }
- 
+
   function renderItemOrders(){
     var item = state.items.find(function(i){return i.id === state.activeItemId;});
     if(!item){
       return '<div class="empty"><div class="glyph">📦</div><h3>Item not found</h3></div>';
     }
- 
+
     var byClient = {};
     state.invoices.forEach(function(inv){
       inv.lines.forEach(function(l){
@@ -664,7 +708,7 @@
     var clients = Object.keys(byClient).map(function(k){return byClient[k];}).sort(function(a,b){return b.total - a.total;});
     var grandTotal = clients.reduce(function(s,c){return s+c.total;}, 0);
     var grandQty = clients.reduce(function(s,c){return s+c.qty;}, 0);
- 
+
     var rows = clients.map(function(c){
       return '<tr>' +
         '<td class="item-name" style="display:flex;align-items:center;gap:10px;">'+thumbHTML({name:c.name},32)+' '+esc(c.name)+'</td>' +
@@ -672,7 +716,7 @@
         '<td class="num">'+fmtMoney(c.total)+'</td>' +
       '</tr>';
     }).join('');
- 
+
     return (
       '<div class="page-head no-print">' +
         '<div><h1>Item Orders</h1><p>Everyone who has ordered '+esc(item.name)+', and how much.</p></div>' +
@@ -703,7 +747,7 @@
       '</div>'
     );
   }
- 
+
   function renderInvoiceView(){
     var inv = state.invoices.find(function(i){return i.id === state.activeInvoiceId;});
     if(!inv){ return '<div class="empty"><div class="glyph">🧾</div><h3>Invoice not found</h3></div>'; }
@@ -715,7 +759,7 @@
         '<td class="amt">'+fmtMoney(l.amount)+'</td>' +
       '</tr>';
     }).join('');
- 
+
     return (
       '<div class="page-head no-print">' +
         '<div><h1>Invoice</h1><p>'+esc(inv.invoiceNo)+'</p></div>' +
@@ -742,7 +786,7 @@
       '</div>'
     );
   }
- 
+
   /* ================= modal ================= */
   function renderModal(){
     if(!state.modal) return '';
@@ -809,7 +853,7 @@
     }
     return '';
   }
- 
+
   /* ================= root render ================= */
   function render(){
     var body = '';
@@ -826,11 +870,11 @@
     document.getElementById('app').innerHTML = html;
     bindEvents();
   }
- 
+
   /* ================= events ================= */
   function bindEvents(){
     var root = document.getElementById('app');
- 
+
     root.querySelectorAll('[data-nav]').forEach(function(el){
       el.addEventListener('click', function(){ goTo(el.getAttribute('data-nav')); });
     });
@@ -851,7 +895,7 @@
     });
     var clearFilter = root.querySelector('[data-clear-filter]');
     if(clearFilter) clearFilter.addEventListener('click', function(){ state.clientFilter = null; render(); });
- 
+
     var addItemBtn = root.querySelector('[data-add-item]');
     if(addItemBtn) addItemBtn.addEventListener('click', function(){ openItemModal(null); });
     root.querySelectorAll('[data-edit-item]').forEach(function(el){
@@ -868,7 +912,7 @@
     });
     var printBtn = root.querySelector('[data-print]');
     if(printBtn) printBtn.addEventListener('click', function(){ window.print(); });
- 
+
     root.querySelectorAll('[data-close-modal]').forEach(function(el){
       el.addEventListener('click', function(){ state.modal = null; render(); });
     });
@@ -880,7 +924,7 @@
     if(confirmDelItem) confirmDelItem.addEventListener('click', function(){ deleteItem(confirmDelItem.getAttribute('data-confirm-del-item')); });
     var confirmDelInvoice = root.querySelector('[data-confirm-del-invoice]');
     if(confirmDelInvoice) confirmDelInvoice.addEventListener('click', function(){ deleteInvoice(confirmDelInvoice.getAttribute('data-confirm-del-invoice')); });
- 
+
     var cancelBtn = root.querySelector('[data-cancel-draft]');
     if(cancelBtn) cancelBtn.addEventListener('click', cancelDraft);
     var saveBtn = root.querySelector('[data-save-draft]');
@@ -900,6 +944,6 @@
       el.addEventListener('change', function(){ updateDraftField(el.getAttribute('data-draft-field'), el.value); });
     });
   }
- 
+
   init();
 })();
