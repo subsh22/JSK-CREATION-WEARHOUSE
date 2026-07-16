@@ -1,4 +1,4 @@
- :root{
+:root{
     --ink:#241C1F;
     --paper:#FBF6EC;
     --surface:#FFFFFF;
@@ -26,7 +26,7 @@
     background-size: 22px 22px;
   }
   .display{font-family:'Fraunces', serif;}
- 
+
   /* ---------- beaded thread signature ---------- */
   .beads{
     height:14px;
@@ -40,7 +40,7 @@
     width:7px;height:7px;border-radius:50%;flex:0 0 auto;
     box-shadow: 0 1px 1px rgba(0,0,0,0.15) inset;
   }
- 
+
   /* ---------- sidebar ---------- */
   .sidebar{
     width:230px;
@@ -101,7 +101,7 @@
     line-height:1.6;
     padding-top:20px;
   }
- 
+
   /* ---------- main ---------- */
   .main{flex:1 1 auto; padding:36px 44px; max-width:1180px;}
   .page-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap;}
@@ -135,7 +135,7 @@
   .btn-danger{background:transparent; color:var(--danger); border:1px solid #EAD3CC;}
   .btn-danger:hover{background:#FBEEEA;}
   .btn[disabled]{opacity:0.4; cursor:not-allowed;}
- 
+
   .card{
     background:var(--surface);
     border:1px solid var(--line);
@@ -155,7 +155,7 @@
   .stat .label{font-size:11.5px; text-transform:uppercase; letter-spacing:0.1em; color:#8A7A6B; font-weight:600;}
   .stat .value{font-family:'Fraunces', serif; font-size:28px; margin-top:6px; color:var(--maroon);}
   .stat .value.teal{color:var(--teal);}
- 
+
   table{width:100%; border-collapse:collapse; font-size:14px;}
   .table-wrap{width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;}
   .table-wrap table{min-width:520px;}
@@ -182,7 +182,7 @@
   }
   .pill.low{background:#FBEEEA; color:var(--danger);}
   .pill.ok{background:var(--teal-soft); color:var(--teal);}
- 
+
   /* ---------- professional form styling (applies anywhere in the app, not just <form>) ---------- */
   .field{margin-bottom:16px;}
   .app label{display:block; font-size:11.5px; font-weight:700; color:#7A6A5A; margin-bottom:7px; text-transform:uppercase; letter-spacing:0.07em;}
@@ -224,7 +224,7 @@
     pointer-events:none;
   }
   .prefix-input input{padding-left:56px;}
- 
+
   /* icon-prefixed inputs, used on the invoice client-detail fields */
   .icon-field{position:relative;}
   .icon-field svg{
@@ -233,7 +233,7 @@
   }
   .icon-field input{padding-left:38px;}
   .icon-field input:focus ~ svg, .icon-field:focus-within svg{stroke:var(--teal);}
- 
+
   .btn-row{display:flex; gap:10px; flex-wrap:wrap;}
   .modal-backdrop{
     position:fixed; inset:0; background:rgba(36,28,31,0.5);
@@ -245,19 +245,19 @@
   }
   .modal h2{font-family:'Fraunces', serif; font-size:21px; margin:0 0 4px;}
   .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:20px;}
- 
+
   .empty{
     text-align:center; padding:50px 20px; color:#8A7A6B;
   }
   .empty .glyph{font-size:32px; margin-bottom:10px; opacity:0.5;}
   .empty h3{font-family:'Fraunces', serif; color:var(--ink); margin:0 0 6px;}
- 
+
   .filter-chip{
     display:inline-flex; align-items:center; gap:8px; background:var(--teal-soft); color:var(--teal);
     padding:6px 12px; border-radius:20px; font-size:12.5px; font-weight:600; margin-bottom:16px;
   }
   .filter-chip button{all:unset; cursor:pointer; font-weight:700;}
- 
+
   /* ---------- invoice builder ---------- */
   .line-item-row{
     display:grid; grid-template-columns: 2fr 90px 110px 110px 34px;
@@ -271,7 +271,7 @@
     all:unset; cursor:pointer; font-size:13px; font-weight:600; color:var(--teal);
     display:inline-flex; align-items:center; gap:6px; margin-top:4px;
   }
- 
+
   .totals-box{
     margin-top:18px; padding-top:16px; border-top:2px solid var(--ink);
     display:flex; justify-content:flex-end;
@@ -279,7 +279,7 @@
   .totals-box .row{display:flex; gap:26px; align-items:baseline;}
   .totals-box .row .lbl{font-size:13px; color:#6B5E53;}
   .totals-box .row .amt{font-family:'Fraunces', serif; font-size:26px; color:var(--maroon);}
- 
+
   /* ---------- invoice preview ---------- */
   .invoice-sheet{
     background:#fff; border-radius:12px; padding:44px 46px; box-shadow:var(--shadow);
@@ -298,14 +298,14 @@
   .inv-items td.qty, .inv-items th.qty{text-align:center;}
   .inv-items td.amt, .inv-items th.amt{text-align:right; font-family:'IBM Plex Mono', monospace; color:var(--teal);}
   .inv-items td .row-item{display:flex; align-items:center; gap:10px;}
- 
+
   @media print{
     .sidebar, .no-print{display:none !important;}
     .main{padding:0; max-width:none;}
     body, .app{background:#fff;}
     .invoice-sheet{box-shadow:none; border:none; padding:0;}
   }
- 
+
   @media (max-width: 860px){
     html, body{max-width:100%; overflow-x:hidden;}
     .app{flex-direction:column; width:100%; overflow-x:hidden;}
@@ -342,7 +342,7 @@
     .prefix-input .prefix-tag{padding:0 10px; font-size:12px;}
     .prefix-input input{padding-left:50px;}
   }
- 
+
   @media (max-width: 480px){
     .brand{font-size:18px;}
     .page-head{flex-direction:column; align-items:flex-start;}
