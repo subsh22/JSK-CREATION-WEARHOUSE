@@ -1087,8 +1087,11 @@ window.firebaseReady = (async function(){
     // item combobox (searchable item picker on invoice lines)
     root.querySelectorAll('[data-combo-input]').forEach(function(el){
       el.addEventListener('focus', function(){
-        state.activeComboLine = el.getAttribute('data-combo-input');
-        withPreservedFocus(render);
+        var lineId = el.getAttribute('data-combo-input');
+        if(state.activeComboLine !== lineId){
+          state.activeComboLine = lineId;
+          withPreservedFocus(render);
+        }
       });
       el.addEventListener('input', function(){
         var lineId = el.getAttribute('data-combo-input');
@@ -1098,6 +1101,7 @@ window.firebaseReady = (async function(){
           var currentItem = state.items.find(function(i){return i.id === line.itemId;});
           if(currentItem && currentItem.name !== el.value){ line.itemId = ''; }
         }
+        state.activeComboLine = lineId;
         withPreservedFocus(render);
       });
       el.addEventListener('keydown', function(e){
@@ -1115,7 +1119,13 @@ window.firebaseReady = (async function(){
       el.addEventListener('blur', function(){
         var lineId = el.getAttribute('data-combo-input');
         setTimeout(function(){
-          if(state.activeComboLine === lineId){ state.activeComboLine = null; render(); }
+          var stillFocused = document.activeElement &&
+            document.activeElement.getAttribute &&
+            document.activeElement.getAttribute('data-combo-input') === lineId;
+          if(!stillFocused && state.activeComboLine === lineId){
+            state.activeComboLine = null;
+            render();
+          }
         }, 150);
       });
     });
