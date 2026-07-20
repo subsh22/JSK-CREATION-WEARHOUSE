@@ -95,7 +95,10 @@ window.firebaseReady = (async function(){
     clientFilter: null,
     formErrors: null,
     editingInvoiceId: null,
-    editingSnapshot: null
+    editingSnapshot: null,
+    activeComboLine: null,
+    pendingLineForNewItem: null,
+    itemSearchQuery: ''
   };
 
   var PALETTE = ['#6C1E3C','#0F6E6E','#C9973B','#3E5C76','#7A4A9E','#1F6E43','#A23B2E','#2E4A6B'];
@@ -124,6 +127,52 @@ window.firebaseReady = (async function(){
     return d.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
   }
   function uid(){ return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  /* filters items for the item combobox: matches whose NAME or any WORD in the
+     name starts with the query are ranked first, plain substring matches after */
+  function comboFilter(items, query){
+    var q = (query||'').trim().toLowerCase();
+    if(!q) return items;
+    var starts = [], contains = [];
+    items.forEach(function(i){
+      var nameLower = i.name.toLowerCase();
+      var words = nameLower.split(/\s+/);
+      if(words.some(function(w){ return w.indexOf(q) === 0; })){
+        starts.push(i);
+      } else if(nameLower.indexOf(q) > -1){
+        contains.push(i);
+      }
+    });
+    return starts.concat(contains);
+  }
+
+  /* re-renders the whole app while keeping the currently focused search/combo
+     input focused (and its cursor position), since render() replaces all HTML */
+  function withPreservedFocus(renderFn){
+    var active = document.activeElement;
+    var selector = null, selStart = null, selEnd = null;
+    var trackAttrs = ['data-combo-input','data-item-search'];
+    if(active){
+      for(var i=0;i<trackAttrs.length;i++){
+        if(active.hasAttribute(trackAttrs[i])){
+          var val = active.getAttribute(trackAttrs[i]);
+          selector = val ? '['+trackAttrs[i]+'="'+val.replace(/"/g,'\\"')+'"]' : '['+trackAttrs[i]+']';
+          break;
+        }
+      }
+      try{ selStart = active.selectionStart; selEnd = active.selectionEnd; }catch(e){}
+    }
+    renderFn();
+    if(selector){
+      var el = document.querySelector(selector);
+      if(el){
+        el.focus();
+        if(selStart != null){
+          try{ el.setSelectionRange(selStart, selEnd); }catch(e){}
+        }
+      }
+    }
+  }
 
   /* thumbnail markup for an item/line: real picture if provided, else a monogram badge */
   function thumbHTML(entity, size){
@@ -193,7 +242,7 @@ window.firebaseReady = (async function(){
       clientName: '',
       phone: '',
       address: '',
-      lines: [ {id:uid(), itemId:'', qty:1} ]
+      lines: [ {id:uid(), itemId:'', qty:1, query:''} ]
     };
   }
 
@@ -206,7 +255,7 @@ window.firebaseReady = (async function(){
       clientName: '',
       phone: '',
       address: '',
-      lines: [ {id:uid(), itemId:itemId, qty:1} ]
+      lines: [ {id:uid(), itemId:itemId, qty:1, query:''} ]
     };
     state.editingInvoiceId = null;
     state.editingSnapshot = null;
@@ -228,13 +277,20 @@ window.firebaseReady = (async function(){
     var unit = (fd.get('unit')||'pc').toString();
     if(!name){ return; }
     var payload = state.modal.payload;
+    var newlyCreatedItem = null;
     if(payload.id){
       var it = state.items.find(function(i){return i.id === payload.id;});
       if(it){ it.name = name; it.qty = qty; it.price = price; it.img = img; it.unit = unit; it.color = colorFor(name); }
     } else {
-      state.items.push({id: uid(), name:name, img:img, color: colorFor(name), qty:qty, price:price, unit:unit});
+      newlyCreatedItem = {id: uid(), name:name, img:img, color: colorFor(name), qty:qty, price:price, unit:unit};
+      state.items.push(newlyCreatedItem);
     }
     await saveItems();
+    if(newlyCreatedItem && state.pendingLineForNewItem && state.draft){
+      var line = state.draft.lines.find(function(l){return l.id === state.pendingLineForNewItem;});
+      if(line){ line.itemId = newlyCreatedItem.id; line.query = newlyCreatedItem.name; }
+    }
+    state.pendingLineForNewItem = null;
     state.modal = null;
     render();
   }
@@ -251,7 +307,7 @@ window.firebaseReady = (async function(){
 
   /* ================= invoice draft editing ================= */
   function addDraftLine(){
-    state.draft.lines.push({id:uid(), itemId:'', qty:1});
+    state.draft.lines.push({id:uid(), itemId:'', qty:1, query:''});
     render();
   }
   function removeDraftLine(lineId){
@@ -262,12 +318,27 @@ window.firebaseReady = (async function(){
   function updateDraftLine(lineId, field, value){
     var line = state.draft.lines.find(function(l){return l.id === lineId;});
     if(!line) return;
-    if(field === 'itemId') line.itemId = value;
+    if(field === 'itemId'){
+      line.itemId = value;
+      var item = state.items.find(function(i){return i.id === value;});
+      line.query = item ? item.name : '';
+    }
     if(field === 'qty') line.qty = Math.max(0, Number(value)||0);
     render();
   }
   function updateDraftField(field, value){
     state.draft[field] = value;
+  }
+
+  function selectComboItem(lineId, itemId){
+    state.activeComboLine = null;
+    updateDraftLine(lineId, 'itemId', itemId);
+  }
+
+  function triggerQuickAddItem(lineId, name){
+    state.activeComboLine = null;
+    state.pendingLineForNewItem = lineId;
+    openItemModal({id:null, name:name, img:'', qty:0, price:0, unit:'pc'});
   }
 
   function draftSubtotal(){
@@ -393,7 +464,7 @@ window.firebaseReady = (async function(){
       clientName: inv.clientName,
       phone: inv.phone || '',
       address: inv.address || '',
-      lines: inv.lines.map(function(l){ return {id:uid(), itemId:l.itemId, qty:l.qty}; })
+      lines: inv.lines.map(function(l){ return {id:uid(), itemId:l.itemId, qty:l.qty, query:l.name||''}; })
     };
     state.formErrors = null;
     state.view = 'new-invoice';
@@ -523,7 +594,13 @@ window.firebaseReady = (async function(){
   }
 
   function renderItems(){
-    var rows = state.items.map(function(i){
+    var query = (state.itemSearchQuery||'').trim().toLowerCase();
+    var filteredItems = query ? state.items.filter(function(i){
+      var words = i.name.toLowerCase().split(/\s+/);
+      return i.name.toLowerCase().indexOf(query) > -1 || words.some(function(w){return w.indexOf(query) === 0;});
+    }) : state.items;
+
+    var rows = filteredItems.map(function(i){
       var low = i.qty <= 5;
       return '<tr>' +
         '<td style="width:44px;">'+thumbHTML(i,40)+'</td>' +
@@ -539,16 +616,26 @@ window.firebaseReady = (async function(){
       '</tr>';
     }).join('');
 
+    var emptyState = state.items.length
+      ? '<div class="empty"><div class="glyph">🔎</div><h3>No matches</h3><p>No items match "'+esc(state.itemSearchQuery)+'".</p></div>'
+      : '<div class="empty"><div class="glyph">📦</div><h3>No items yet</h3><p>Add your first item to start building invoices.</p></div>';
+
     return (
       '<div class="page-head">' +
         '<div><h1>Inventory</h1><p>Items you stock, their quantity on hand, and price per piece.</p></div>' +
-        '<button class="btn btn-gold" data-add-item>+ Add Item</button>' +
+        '<div class="btn-row">' +
+          '<div class="icon-field" style="width:230px;">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>' +
+            '<input type="text" data-item-search value="'+esc(state.itemSearchQuery||'')+'" placeholder="Search items…">' +
+          '</div>' +
+          '<button class="btn btn-gold" data-add-item>+ Add Item</button>' +
+        '</div>' +
       '</div>' +
       beadsDivider() +
       '<div class="card">' +
-      (state.items.length ?
+      (filteredItems.length ?
         '<div class="table-wrap"><table><thead><tr><th></th><th>Item Name</th><th>Quantity We Have</th><th>Price per pc</th><th>Stock Value</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
-        : '<div class="empty"><div class="glyph">📦</div><h3>No items yet</h3><p>Add your first item to start building invoices.</p></div>') +
+        : emptyState) +
       '</div>'
     );
   }
@@ -560,12 +647,31 @@ window.firebaseReady = (async function(){
     var lineRows = d.lines.map(function(l){
       var item = state.items.find(function(i){return i.id === l.itemId;});
       var amount = item ? item.price * l.qty : 0;
-      var opts = '<option value="">Select item…</option>' + state.items.map(function(i){
-        return '<option value="'+i.id+'" '+(i.id===l.itemId?'selected':'')+'>'+esc(i.name)+' ('+i.qty+' '+unitLabel(i.unit)+' left)</option>';
-      }).join('');
+      var query = item ? item.name : (l.query || '');
+      var isActive = (state.activeComboLine === l.id);
+      var hasExact = state.items.some(function(i){return i.name.trim().toLowerCase() === query.trim().toLowerCase();});
+      var listHtml = '';
+      if(isActive){
+        var matches = comboFilter(state.items, query).slice(0,8);
+        listHtml += matches.map(function(i){
+          return '<div class="combo-item" data-combo-pick="'+l.id+'" data-combo-item-id="'+i.id+'">' +
+            thumbHTML(i,24) +
+            '<div class="combo-item-text"><div class="combo-item-name">'+esc(i.name)+'</div><div class="muted" style="font-size:11px;">'+i.qty+' '+unitLabel(i.unit)+' left &middot; '+fmtMoney(i.price)+'/'+unitLabel(i.unit)+'</div></div>' +
+          '</div>';
+        }).join('');
+        if(query.trim() && !hasExact){
+          listHtml += '<div class="combo-item combo-add" data-combo-quickadd="'+l.id+'" data-combo-quickadd-name="'+esc(query.trim())+'">+ Add "'+esc(query.trim())+'" as new item</div>';
+        }
+        if(!matches.length && !query.trim()){
+          listHtml += '<div class="combo-empty muted">Type to search items…</div>';
+        }
+      }
       return (
         '<div class="line-item-row">' +
-          '<select data-line="'+l.id+'" data-field="itemId">'+opts+'</select>' +
+          '<div class="combo">' +
+            '<input type="text" class="combo-input" data-combo-input="'+l.id+'" value="'+esc(query)+'" placeholder="Type item name…" autocomplete="off">' +
+            (isActive ? '<div class="combo-list">'+listHtml+'</div>' : '') +
+          '</div>' +
           '<input type="number" min="0" step="1" value="'+l.qty+'" data-line="'+l.id+'" data-field="qty">' +
           '<div class="muted" style="text-align:right;">'+(item?fmtMoney(item.price)+'/'+unitLabel(item.unit):'—')+'</div>' +
           '<div class="amt">'+fmtMoney(amount)+'</div>' +
@@ -977,6 +1083,63 @@ window.firebaseReady = (async function(){
       el.addEventListener('input', function(){ updateDraftField(el.getAttribute('data-draft-field'), el.value); });
       el.addEventListener('change', function(){ updateDraftField(el.getAttribute('data-draft-field'), el.value); });
     });
+
+    // item combobox (searchable item picker on invoice lines)
+    root.querySelectorAll('[data-combo-input]').forEach(function(el){
+      el.addEventListener('focus', function(){
+        state.activeComboLine = el.getAttribute('data-combo-input');
+        withPreservedFocus(render);
+      });
+      el.addEventListener('input', function(){
+        var lineId = el.getAttribute('data-combo-input');
+        var line = state.draft.lines.find(function(l){return l.id === lineId;});
+        if(line){
+          line.query = el.value;
+          var currentItem = state.items.find(function(i){return i.id === line.itemId;});
+          if(currentItem && currentItem.name !== el.value){ line.itemId = ''; }
+        }
+        withPreservedFocus(render);
+      });
+      el.addEventListener('keydown', function(e){
+        if(e.key !== 'Enter') return;
+        e.preventDefault();
+        var lineId = el.getAttribute('data-combo-input');
+        var q = el.value.trim();
+        if(!q) return;
+        var exact = state.items.find(function(i){return i.name.trim().toLowerCase() === q.toLowerCase();});
+        if(exact){ selectComboItem(lineId, exact.id); return; }
+        var matches = comboFilter(state.items, q);
+        if(matches.length === 1){ selectComboItem(lineId, matches[0].id); }
+        else if(matches.length === 0){ triggerQuickAddItem(lineId, q); }
+      });
+      el.addEventListener('blur', function(){
+        var lineId = el.getAttribute('data-combo-input');
+        setTimeout(function(){
+          if(state.activeComboLine === lineId){ state.activeComboLine = null; render(); }
+        }, 150);
+      });
+    });
+    root.querySelectorAll('[data-combo-pick]').forEach(function(el){
+      el.addEventListener('mousedown', function(e){
+        e.preventDefault();
+        selectComboItem(el.getAttribute('data-combo-pick'), el.getAttribute('data-combo-item-id'));
+      });
+    });
+    root.querySelectorAll('[data-combo-quickadd]').forEach(function(el){
+      el.addEventListener('mousedown', function(e){
+        e.preventDefault();
+        triggerQuickAddItem(el.getAttribute('data-combo-quickadd'), el.getAttribute('data-combo-quickadd-name'));
+      });
+    });
+
+    // inventory search box
+    var itemSearchEl = root.querySelector('[data-item-search]');
+    if(itemSearchEl){
+      itemSearchEl.addEventListener('input', function(){
+        state.itemSearchQuery = itemSearchEl.value;
+        withPreservedFocus(render);
+      });
+    }
   }
 
   init();
