@@ -188,7 +188,7 @@ window.firebaseReady = (async function(){
     state.invoiceCounter += 1;
     state.draft = {
       invoiceNo: 'JSK-' + state.invoiceCounter,
-      dcNo: '',
+      deliveryCharges: 0,
       date: new Date().toISOString().slice(0,10),
       clientName: '',
       phone: '',
@@ -201,7 +201,7 @@ window.firebaseReady = (async function(){
     state.invoiceCounter += 1;
     state.draft = {
       invoiceNo: 'JSK-' + state.invoiceCounter,
-      dcNo: '',
+      deliveryCharges: 0,
       date: new Date().toISOString().slice(0,10),
       clientName: '',
       phone: '',
@@ -270,13 +270,21 @@ window.firebaseReady = (async function(){
     state.draft[field] = value;
   }
 
-  function draftTotal(){
+  function draftSubtotal(){
     var total = 0;
     state.draft.lines.forEach(function(l){
       var item = state.items.find(function(i){return i.id === l.itemId;});
       if(item) total += item.price * l.qty;
     });
     return total;
+  }
+
+  function draftDeliveryCharges(){
+    return Number(state.draft.deliveryCharges) || 0;
+  }
+
+  function draftTotal(){
+    return draftSubtotal() + draftDeliveryCharges();
   }
 
   function draftErrors(){
@@ -299,7 +307,9 @@ window.firebaseReady = (async function(){
       var item = state.items.find(function(i){return i.id === l.itemId;});
       return {itemId:item.id, name:item.name, img:item.img, color:item.color, unit:item.unit, qty:l.qty, price:item.price, amount:item.price*l.qty};
     });
-    var total = lines.reduce(function(s,l){return s+l.amount;}, 0);
+    var subtotal = lines.reduce(function(s,l){return s+l.amount;}, 0);
+    var deliveryCharges = Number(state.draft.deliveryCharges) || 0;
+    var total = subtotal + deliveryCharges;
 
     lines.forEach(function(l){
       var item = state.items.find(function(i){return i.id === l.itemId;});
@@ -311,11 +321,12 @@ window.firebaseReady = (async function(){
       var existing = state.invoices.find(function(i){return i.id === state.editingInvoiceId;});
       if(existing){
         existing.date = state.draft.date;
-        existing.dcNo = (state.draft.dcNo||'').trim();
+        existing.deliveryCharges = deliveryCharges;
         existing.clientName = state.draft.clientName.trim();
         existing.phone = state.draft.phone.trim();
         existing.address = state.draft.address.trim();
         existing.lines = lines;
+        existing.subtotal = subtotal;
         existing.total = total;
         savedId = existing.id;
       }
@@ -325,12 +336,13 @@ window.firebaseReady = (async function(){
       var invoice = {
         id: uid(),
         invoiceNo: state.draft.invoiceNo,
-        dcNo: (state.draft.dcNo||'').trim(),
+        deliveryCharges: deliveryCharges,
         date: state.draft.date,
         clientName: state.draft.clientName.trim(),
         phone: state.draft.phone.trim(),
         address: state.draft.address.trim(),
         lines: lines,
+        subtotal: subtotal,
         total: total
       };
       state.invoices.unshift(invoice);
@@ -376,7 +388,7 @@ window.firebaseReady = (async function(){
     state.editingSnapshot = inv.lines.map(function(l){ return {itemId:l.itemId, qty:l.qty}; });
     state.draft = {
       invoiceNo: inv.invoiceNo,
-      dcNo: inv.dcNo || '',
+      deliveryCharges: inv.deliveryCharges || 0,
       date: inv.date,
       clientName: inv.clientName,
       phone: inv.phone || '',
@@ -604,7 +616,7 @@ window.firebaseReady = (async function(){
         '<div class="card">' +
           '<h3 class="display" style="margin:0 0 14px;font-size:16px;">Invoice Meta</h3>' +
           '<div class="field"><label>Invoice No.</label><div class="prefix-input"><span class="prefix-tag">JSK</span><input type="text" value="'+esc(d.invoiceNo.replace(/^JSK-/,''))+'" disabled></div></div>' +
-          '<div class="field"><label>DC No. (Delivery Challan)</label><input type="text" data-draft-field="dcNo" value="'+esc(d.dcNo||'')+'" placeholder="e.g. 0451"></div>' +
+          '<div class="field"><label>Delivery Charges</label><div class="prefix-input"><span class="prefix-tag">Rs.</span><input type="number" min="0" step="1" data-draft-field="deliveryCharges" value="'+(Number(d.deliveryCharges)||0)+'" placeholder="0"></div></div>' +
           '<p class="field-hint">Invoice numbers are generated automatically in sequence.</p>' +
         '</div>' +
       '</div>' +
@@ -615,7 +627,11 @@ window.firebaseReady = (async function(){
           lineRows +
           '<button class="add-row-btn" data-add-line>+ Add another item</button>')
           : '<div class="empty"><div class="glyph">📦</div><h3>No items in inventory</h3><p>Add items in the Inventory tab first.</p></div>') +
-        '<div class="totals-box"><div class="row"><span class="lbl">Total Price</span><span class="amt">'+fmtMoney(draftTotal())+'</span></div></div>' +
+        '<div class="totals-box"><div class="row" style="flex-direction:column; align-items:flex-end; gap:6px;">' +
+          '<div style="display:flex; gap:26px; align-items:baseline;"><span class="lbl">Items Subtotal</span><span class="muted num">'+fmtMoney(draftSubtotal())+'</span></div>' +
+          '<div style="display:flex; gap:26px; align-items:baseline;"><span class="lbl">Delivery Charges</span><span class="muted num">'+fmtMoney(draftDeliveryCharges())+'</span></div>' +
+          '<div style="display:flex; gap:26px; align-items:baseline;"><span class="lbl">Total Price</span><span class="amt">'+fmtMoney(draftTotal())+'</span></div>' +
+        '</div></div>' +
       '</div>'
     );
   }
@@ -630,7 +646,7 @@ window.firebaseReady = (async function(){
 
     var rows = list.map(function(inv){
       return '<tr>' +
-        '<td class="item-name">'+esc(inv.invoiceNo)+(inv.dcNo?'<div class="muted">DC: '+esc(inv.dcNo)+'</div>':'')+'</td>' +
+        '<td class="item-name">'+esc(inv.invoiceNo)+'</td>' +
         '<td>'+esc(inv.clientName)+'<div class="muted">'+esc(inv.phone||'')+'</div></td>' +
         '<td>'+fmtDate(inv.date)+'</td>' +
         '<td>'+inv.lines.length+' item(s)</td>' +
@@ -783,7 +799,7 @@ window.firebaseReady = (async function(){
       '<div class="invoice-sheet">' +
         '<div class="inv-top">' +
           '<div class="inv-brand">JSK Creation<small>Beads &amp; Jewellery Supply</small></div>' +
-          '<div class="inv-meta">Invoice No.<br><span class="num">'+esc(inv.invoiceNo)+'</span>'+(inv.dcNo?'<br>DC No.: <span class="num">'+esc(inv.dcNo)+'</span>':'')+'<br>Date: '+fmtDate(inv.date)+'</div>' +
+          '<div class="inv-meta">Invoice No.<br><span class="num">'+esc(inv.invoiceNo)+'</span><br>Date: '+fmtDate(inv.date)+'</div>' +
         '</div>' +
         beadsDivider() +
         '<div class="inv-client">' +
@@ -793,7 +809,13 @@ window.firebaseReady = (async function(){
         '<div class="inv-items table-wrap">' +
           '<table><thead><tr><th>Item</th><th class="qty">Quantity</th><th class="amt">Price</th><th class="amt">Amount</th></tr></thead><tbody>'+rows+'</tbody></table>' +
         '</div>' +
-        '<div class="totals-box"><div class="row"><span class="lbl">Total Price</span><span class="amt">'+fmtMoney(inv.total)+'</span></div></div>' +
+        '<div class="totals-box"><div class="row" style="flex-direction:column; align-items:flex-end; gap:6px;">' +
+          (inv.deliveryCharges ?
+            ('<div style="display:flex; gap:26px; align-items:baseline;"><span class="lbl">Items Subtotal</span><span class="muted num">'+fmtMoney(inv.subtotal!=null?inv.subtotal:(inv.total-inv.deliveryCharges))+'</span></div>' +
+            '<div style="display:flex; gap:26px; align-items:baseline;"><span class="lbl">Delivery Charges</span><span class="muted num">'+fmtMoney(inv.deliveryCharges)+'</span></div>')
+            : '') +
+          '<div style="display:flex; gap:26px; align-items:baseline;"><span class="lbl">Total Price</span><span class="amt">'+fmtMoney(inv.total)+'</span></div>' +
+        '</div></div>' +
         invoiceFooterHTML() +
       '</div>'
     );
