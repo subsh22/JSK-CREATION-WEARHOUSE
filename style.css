@@ -329,11 +329,24 @@
   .inv-items td.amt, .inv-items th.amt{text-align:right; font-family:'IBM Plex Mono', monospace; color:var(--teal);}
   .inv-items td .row-item{display:flex; align-items:center; gap:10px;}
 
+  /* ---------- printed footer branding ---------- */
+  .inv-footer{
+    margin-top:36px; padding-top:16px; border-top:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    font-family:'Fraunces', serif; font-size:12.5px; font-weight:600; letter-spacing:0.04em;
+    color:#9A8C7C; text-align:center;
+  }
+  .inv-footer .dot-sep{width:4px; height:4px; border-radius:50%; background:var(--gold); flex:0 0 auto;}
+
   @media print{
     .sidebar, .no-print{display:none !important;}
-    .main{padding:0; max-width:none;}
-    body, .app{background:#fff;}
-    .invoice-sheet{box-shadow:none; border:none; padding:0;}
+    .app{display:block; min-height:0; background:#fff; background-image:none;}
+    .main{padding:0; max-width:none; min-height:0;}
+    body{margin:0; background:#fff;}
+    html{height:auto;}
+    .invoice-sheet{box-shadow:none; border:none; padding:0; page-break-inside:avoid;}
+    .inv-items table, .inv-items tr{page-break-inside:avoid;}
+    @page{margin:14mm;}
   }
 
   /* ---------- tablet / small laptop tightening ---------- */
